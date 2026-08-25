@@ -56,10 +56,7 @@ p.write_text(json.dumps(d, indent=2, sort_keys=True, ensure_ascii=False))
 sleep 1   # the app watches the file; give it a moment to pick the change up
 
 echo "==> Opening the scene"
-# Chrome, not Safari: Safari shows a "make me your default" banner that
-# lands in the middle of the frame.
-open -a "Google Chrome" "file://$PWD/docs/demo/scene.html"
-sleep 3
+Scripts/open-scene.sh
 
 echo "==> Recording"
 screencapture -v -g -V 22 -x "$OUT" &
@@ -77,11 +74,30 @@ wait "$recorder" 2>/dev/null || true
 # Cropped to the band holding the card and the overlay. The full screen carries
 # a menu bar, a dock and whatever else happens to be open -- none of it the
 # subject, all of it somebody's private desktop.
-# Measured, not guessed: the composer occupies 521-764pt and the overlay
-# 830-910pt, so the band runs from just above the card to just below the
-# overlay. It stops short of 915pt, where the browser window ends and the
-# desktop behind it starts. Pixels are twice the points on this display.
-CROP="${CROP:-1620:830:640:1000}"
+# Anchored to the overlay rather than to a constant. The app logs where it drew
+# the panel, and the frame is built upward from there: everything above it up to
+# the top of the conversation, nothing below it where the browser window ends
+# and the desktop begins. Re-measuring by hand every time the page changes is
+# how the first take ended up framing an empty composer.
+rect=$(/usr/bin/log show --last 60s --info --style compact \
+    --predicate 'subsystem == "dev.enikiforov.monsieur"' 2>/dev/null \
+    | grep -oE 'hud rect [0-9]+,[0-9]+,[0-9]+,[0-9]+' | tail -1 | cut -d' ' -f3)
+
+if [ -n "$rect" ]; then
+    IFS=, read -r _hx hy _hw hh <<< "$rect"
+    CROP=$(python3 -c "
+scale = 2                      # points to pixels on this display
+bottom = ($hy + $hh + 8) * scale
+height = 780 * scale           # enough to keep the channel list whole
+width  = 1440 * scale          # stops short of the Dock, which is
+                               # somebody's personal set of apps
+print(f'{width}:{height}:0:{max(0, bottom - height)}')
+")
+else
+    CROP="${CROP:-2360:1400:0:420}"
+fi
+echo "==> Framing $CROP"
+
 ffmpeg -v error -i "$OUT" -vf "crop=$CROP" -c:v h264 -crf 20 -c:a aac \
        "${OUT%.mov}-cropped.mp4" -y
 mv "${OUT%.mov}-cropped.mp4" "${OUT%.mov}.mp4"
