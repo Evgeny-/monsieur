@@ -92,4 +92,4 @@ that file out of git too, same as settings.json.
 The video in the README is a real screen recording of the app working, driven by
 `Scripts/record-demo.sh`. The procedure, the checks worth running on a take, and
 the several ways a take can come out plausible but wrong are written up in
-[.claude/skills/record-demo/SKILL.md](.claude/skills/record-demo/SKILL.md).
+[skills/record-demo/SKILL.md](skills/record-demo/SKILL.md).

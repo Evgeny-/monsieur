@@ -22,9 +22,14 @@ is behind the window, so nothing rendered offscreen looks right.
 ## Recording
 
 ```bash
-export TTS_KEY=$(grep -E "^ELEVENLABS_API_KEY" ~/Projects/Psyside/.env | sed -E 's/^[^=]+=//; s/^"//; s/"$//')
+export TTS_KEY=…      # an ElevenLabs key with text-to-speech permission
 Scripts/record-demo.sh
 ```
+
+The key that transcribes is not necessarily the key that speaks: permissions are
+per-key on ElevenLabs, and a transcription-only key returns 401 from the
+text-to-speech endpoint. `TTS_KEY` is only used to synthesise the line, and only
+when `docs/demo/line.mp3` is missing.
 
 **The room has to be silent and the machine untouched for ~30 seconds.** The
 loop is acoustic on purpose — speakers to microphone, no virtual audio device —
@@ -97,22 +102,34 @@ script pins.
 
 ## Getting sound into the README
 
-GitHub will not play a video that lives in the repository. Verified against its
-own renderer:
+`<video>` does work in a README — but only for a source GitHub itself hosts.
+Checked against the real renderer (`gh api repos/OWNER/REPO/readme -H "Accept:
+application/vnd.github.html+json"`), not the `/markdown` API, which strips
+`<video>` in every case and will mislead you:
 
-| Written as | Rendered as |
+| `src` | What the README renderer does |
 |---|---|
-| `![x](docs/demo/demo.mp4)` | `<img src="...mp4">` — a broken image |
-| a bare raw URL | a plain link |
-| `<video src="...">` | stripped entirely |
+| `https://github.com/user-attachments/assets/…` | Keeps the element, rewrites the URL to a signed one, adds `controls` |
+| `https://github.com/OWNER/REPO/raw/main/x.mp4` | Strips the element |
+| `docs/demo/demo.mp4` (relative) | Strips the element |
 
-The only thing that produces a real player is an asset uploaded through the web
-interface: open any issue, drag `docs/demo/demo.mp4` into the comment box, and
-GitHub returns a `https://github.com/user-attachments/assets/…` URL. That URL,
-on its own line in the README, renders as a player with sound. The issue itself
-does not need to be submitted.
+So committing the file is not enough, however it is referenced. The asset has to
+be uploaded through the web interface: open any issue, drag `docs/demo/demo.mp4`
+into the comment box, and GitHub returns a `user-attachments` URL. Wrap that:
 
-Until then the README shows `demo.gif`, which is silent — and hearing the French
-is half the point, so this is worth doing once the repository is public.
-Attachments on a private repository are only served to people who can already
-see it.
+```html
+<video src="https://github.com/user-attachments/assets/…" controls></video>
+```
+
+The issue does not need to be submitted. Note that attachments on a private
+repository are only served to people who can already see it, so the player will
+look broken to anyone else until the repository is public.
+
+Until that is done the README shows `demo.gif`, which is silent — and hearing
+the French is half the point.
+
+---
+
+This lives in `skills/` rather than under any one assistant's directory so that
+whatever tool you use can read it. `.claude/skills/record-demo` is a symlink to
+here, which is only how Claude Code happens to discover skills.
