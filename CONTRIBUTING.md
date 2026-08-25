@@ -86,3 +86,10 @@ Nothing in this repository should ever carry a real API key. Settings
 import `ELEVENLABS_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` from a
 local `.env` file, filling in only whichever keys are currently empty -- keep
 that file out of git too, same as settings.json.
+
+## Re-recording the demo
+
+The video in the README is a real screen recording of the app working, driven by
+`Scripts/record-demo.sh`. The procedure, the checks worth running on a take, and
+the several ways a take can come out plausible but wrong are written up in
+[.claude/skills/record-demo/SKILL.md](.claude/skills/record-demo/SKILL.md).

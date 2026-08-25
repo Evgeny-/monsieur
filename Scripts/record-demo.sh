@@ -90,12 +90,15 @@ if [ -n "$rect" ]; then
     IFS=, read -r _hx hy _hw hh <<< "$rect"
     CROP=$(python3 -c "
 scale = 2                      # points to pixels on this display
-bottom = ($hy + $hh + 8) * scale
+geom = open('/tmp/monsieur-scene-geometry').read().split()
+# The bottom edge follows the window, not the overlay. Anchoring it to the
+# overlay clipped the composer as soon as the composer moved below it -- and the
+# window is full height, so both are guaranteed to be inside this.
+bottom = (int(geom[2]) - 14) * scale
 height = 780 * scale           # enough to keep the channel list whole
 # Framed to the window, not the display: the window is narrower than the
 # screen and centred, and open-scene.sh writes its geometry out so this does
 # not have to assume either.
-geom = open('/tmp/monsieur-scene-geometry').read().split()
 width  = int(geom[0]) * scale
 left   = int(geom[1]) * scale
 print(f'{width}:{height}:{left}:{max(0, bottom - height)}')
