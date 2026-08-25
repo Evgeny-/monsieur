@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBar = MenuBarController(controller: controller)
+        RemoteControl.listen(controller: controller)
 
         applyHotkeys(SettingsStore.shared.settings)
         // The emitted value has to be used rather than re-read from the store:

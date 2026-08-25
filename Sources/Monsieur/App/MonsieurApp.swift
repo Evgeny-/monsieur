@@ -16,6 +16,13 @@ enum MonsieurApp {
             guard arguments.count > index + 1 else { usage() }
             exit(CommandLineModes.transcribe(path: arguments[index + 1]))
         }
+        if let index = arguments.firstIndex(of: "--signal"),
+           arguments.count > index + 1,
+           let command = RemoteControl.Command(
+               rawValue: "dev.enikiforov.monsieur." + arguments[index + 1]) {
+            RemoteControl.send(command)
+            exit(0)
+        }
         if arguments.contains("--probe-focus") {
             exit(FocusProbe.run())
         }
@@ -84,6 +91,8 @@ enum MonsieurApp {
           --transcribe file.wav      run a file through transcription + rewriting
           --preview-style [name|all] show the overlay designs with sample text
           --probe-focus              report what every app exposes as its focused element
+          --signal <toggle|toggleVerbatim|cancel>
+                                     drive the running app from a script
 
         """.utf8))
         exit(2)
