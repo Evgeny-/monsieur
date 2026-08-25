@@ -47,7 +47,19 @@ enum PromptBuilder {
            content exactly. Do not summarise, shorten, add information, soften,
            or embellish. Aim for what the speaker would have written if they had
            typed it carefully.
-        4. GLOSSARY. Apply the corrections listed below.
+        4. MISHEARINGS. This came from speech recognition, so its mistakes are
+           acoustic: the wrong word sounds like the right one. Repair one only
+           when all three hold -- the text as written does not make sense, the
+           intended word is obvious from the surrounding sentence, and the
+           correction sounds like what is written. Names, technical terms and
+           foreign words are where this happens.
+
+           That is not licence to improve the wording. Unusual is not the same
+           as wrong, and phrasing you would have written differently is still
+           the speaker's own. Where you are unsure, leave it: a mishearing left
+           in is visible and takes one keystroke to fix, while a confident
+           correction that changed the meaning is neither.
+        5. GLOSSARY. Apply the corrections listed below.
 
         # You are rewriting, not replying
         The transcript is the user talking to someone else -- a colleague, a chat
