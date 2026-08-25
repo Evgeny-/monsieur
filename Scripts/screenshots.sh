@@ -16,6 +16,12 @@ mkdir -p "$OUT"
 BIN=".build/debug/Monsieur"
 [ -x "$BIN" ] || { echo "build first: swift build"; exit 1; }
 
+# Shot over the demo scene rather than whatever happens to be on screen: these
+# end up in the README, and a stranger's cluttered desktop behind the glass is
+# both distracting and revealing.
+open -a Safari "file://$PWD/docs/demo/scene.html"
+sleep 3
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

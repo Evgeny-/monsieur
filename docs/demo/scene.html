@@ -1,44 +1,86 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Monsieur</title>
+<title>Northwind</title>
+<!--
+  A stand-in for some ordinary web app you happen to be typing into. It knows
+  nothing about Monsieur, mentions no hotkey and no languages, and would behave
+  exactly the same if the app were not installed -- which is the entire claim
+  being demonstrated: this works in things that were never built for it.
+-->
 <style>
-  :root { color-scheme: dark; }
+  :root { color-scheme: light; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; height: 100vh; display: grid; place-items: center;
-    background: radial-gradient(1200px 800px at 30% 20%, #1d2333, #0d1016 70%);
-    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-    color: #e8ecf3;
+    margin: 0; min-height: 100vh;
+    display: grid; place-items: end center; padding-bottom: 210px;
+    background: #f4f5f8;
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    color: #1c2330;
   }
-  .card {
-    width: 720px; padding: 28px 30px 24px;
-    background: rgba(255,255,255,.045);
-    border: 1px solid rgba(255,255,255,.10);
-    border-radius: 18px;
-    box-shadow: 0 30px 80px rgba(0,0,0,.55);
-    backdrop-filter: blur(20px);
+  header {
+    position: fixed; top: 0; left: 0; right: 0; height: 54px;
+    display: flex; align-items: center; gap: 10px; padding: 0 26px;
+    background: #fff; border-bottom: 1px solid #e6e8ee;
   }
-  .row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 18px; }
-  .to { color: #7d879b; font-size: 13px; }
+  .mark {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: linear-gradient(135deg, #4c6ef5, #22b8cf);
+  }
+  .brand { font-weight: 600; letter-spacing: -.2px; }
+  nav { margin-left: auto; display: flex; gap: 22px; color: #7a8497; font-size: 14px; }
+
+  .composer {
+    width: 760px; background: #fff;
+    border: 1px solid #e3e6ee; border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(24,34,60,.09);
+    overflow: hidden;
+  }
+  .meta {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px; border-bottom: 1px solid #eef0f5;
+    color: #7a8497; font-size: 13px;
+  }
   .chip {
-    font-size: 13px; padding: 3px 10px; border-radius: 20px;
-    background: rgba(120,150,255,.16); color: #a9c0ff;
+    padding: 3px 10px; border-radius: 20px;
+    background: #eef2ff; color: #3b5bdb; font-weight: 500;
   }
   textarea {
-    width: 100%; min-height: 130px; resize: none; border: 0; outline: 0;
-    background: transparent; color: inherit; font: inherit; letter-spacing: .1px;
+    display: block; width: 100%; min-height: 128px; padding: 18px 20px;
+    border: 0; outline: 0; resize: none; font: inherit; color: inherit;
   }
-  textarea::placeholder { color: #4d566b; }
-  .hint { margin-top: 18px; color: #5b647a; font-size: 12px; }
-  kbd {
-    font: 11px/1 ui-monospace, monospace; padding: 3px 6px; border-radius: 5px;
-    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.09);
-    color: #98a3b8;
+  textarea::placeholder { color: #a9b1c1; }
+  .actions {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px 14px; border-top: 1px solid #eef0f5;
   }
+  .send {
+    margin-left: auto; padding: 7px 18px; border: 0; border-radius: 8px;
+    background: #3b5bdb; color: #fff; font: inherit; font-weight: 500;
+  }
+  .ghost { color: #aeb6c4; font-size: 18px; padding: 0 4px; }
 </style>
-<div class="card">
-  <div class="row"><span class="to">To</span><span class="chip">#deploys</span></div>
-  <textarea autofocus placeholder="Hold a hotkey and say it in any language…"></textarea>
-  <div class="hint">Monsieur — press <kbd>F3</kbd>, speak, and it lands here in English.</div>
-</div>
-<script>document.querySelector("textarea").focus();</script>
+
+<header>
+  <div class="mark"></div><div class="brand">Northwind</div>
+  <nav><span>Inbox</span><span>Threads</span><span>Drafts</span></nav>
+</header>
+
+<form class="composer" onsubmit="return false">
+  <div class="meta">To<span class="chip">#deploys</span></div>
+  <textarea placeholder="Write a message…"></textarea>
+  <div class="actions">
+    <span class="ghost">＋</span><span class="ghost">☺</span>
+    <button class="send" type="button">Send</button>
+  </div>
+</form>
+
+<script>
+  // Repeated, not once: a browser settles focus into its address bar shortly
+  // after load, and a single autofocus at parse time loses that race -- which
+  // sent the first recorded take's text into the URL field instead.
+  const box = document.querySelector("textarea");
+  const grab = () => { window.focus(); box.focus(); };
+  grab();
+  const timer = setInterval(grab, 150);
+  setTimeout(() => clearInterval(timer), 5000);
+</script>
