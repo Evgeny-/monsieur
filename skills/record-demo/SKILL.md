@@ -121,9 +121,19 @@ into the comment box, and GitHub returns a `user-attachments` URL. Wrap that:
 <video src="https://github.com/user-attachments/assets/…" controls></video>
 ```
 
-The issue does not need to be submitted. Note that attachments on a private
-repository are only served to people who can already see it, so the player will
-look broken to anyone else until the repository is public.
+The issue does not need to be submitted.
+
+**Upload only once the repository is public.** An asset uploaded while it was
+private keeps those permissions afterwards -- making the repository public later
+does not retroactively open it. Checked: the same URL returned `200 video/mp4`
+with a token and `404 Not Found` without one, so a visitor saw an empty space
+where the player should be. Verify with:
+
+```bash
+curl -sL -o /dev/null -w "%{http_code} %{content_type}\n" <asset-url>
+```
+
+anonymously, not from a browser already signed in to GitHub.
 
 After re-recording, the README still points at the *previous* upload: the asset
 URL is fixed at upload time and has no relationship to the file in the
