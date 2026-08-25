@@ -29,7 +29,10 @@ final class HUDController {
     /// The overlay is small on purpose, and smaller still when it has nothing to
     /// say. Wherever it sits it covers something.
     static func size(showingText: Bool) -> CGSize {
-        showingText ? CGSize(width: 340, height: 44) : CGSize(width: 74, height: 40)
+        // Square without the text, so the capsule resolves into a circle. A
+        // wider-than-tall pill with a single dot in it reads as a container
+        // waiting for content that never arrives.
+        showingText ? CGSize(width: 340, height: 44) : CGSize(width: 44, height: 44)
     }
 
     func show(controller: DictationController, settings: Settings) {

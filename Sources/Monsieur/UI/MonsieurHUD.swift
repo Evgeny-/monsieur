@@ -29,7 +29,7 @@ struct MonsieurHUD: View {
                 .frame(width: 340, height: 44, alignment: .leading)
             } else {
                 indicator
-                    .frame(width: 74, height: 40)
+                    .frame(width: 44, height: 44)
             }
         }
         .background { VisualEffectBackground() }
