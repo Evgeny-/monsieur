@@ -16,7 +16,7 @@ is behind the window, so nothing rendered offscreen looks right.
 |---|---|
 | `docs/demo/scene.html` | The mock app being typed into. Knows nothing about Monsieur. |
 | `Scripts/open-scene.sh` | Opens it in a chromeless, isolated Chrome window. |
-| `Scripts/record-demo.sh` | Drives the whole take and writes `docs/demo/demo.mp4` and `.gif`. |
+| `Scripts/record-demo.sh` | Drives the whole take and writes `docs/demo/demo.mp4`. |
 | `docs/demo/line.mp3` | The spoken line. Delete it to have it re-synthesised. |
 
 ## Recording
@@ -125,8 +125,10 @@ The issue does not need to be submitted. Note that attachments on a private
 repository are only served to people who can already see it, so the player will
 look broken to anyone else until the repository is public.
 
-Until that is done the README shows `demo.gif`, which is silent — and hearing
-the French is half the point.
+After re-recording, the README still points at the *previous* upload: the asset
+URL is fixed at upload time and has no relationship to the file in the
+repository. Re-upload and swap the URL, or the README will keep showing the old
+take.
 
 ---
 
