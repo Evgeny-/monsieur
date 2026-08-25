@@ -29,9 +29,8 @@ enum MonsieurApp {
         if arguments.contains("--check") {
             exit(CommandLineModes.check())
         }
-        if let index = arguments.firstIndex(of: "--preview-style") {
-            let name = arguments.count > index + 1 ? arguments[index + 1] : "all"
-            runStylePreview(name: name)
+        if arguments.contains("--preview-hud") {
+            previewHUD()
             return
         }
         if arguments.contains("--help") || arguments.contains("-h") {
@@ -48,31 +47,18 @@ enum MonsieurApp {
         application.run()
     }
 
-    /// Shows each overlay design in turn with sample content, then quits.
-    /// Comparing them side by side beats picking one from a menu blind.
+    /// Shows the overlay with sample content, where and how the settings say,
+    /// then quits. Cheaper than dictating to find out.
     @MainActor
-    private static func runStylePreview(name: String) {
-        let styles: [HUDStyleID]
-        if name == "all" {
-            styles = HUDStyleID.allCases
-        } else if let one = HUDStyleID(rawValue: name) {
-            styles = [one]
-        } else {
-            let names = HUDStyleID.allCases.map(\.rawValue).joined(separator: ", ")
-            FileHandle.standardError.write(Data("unknown style. one of: \(names), all\n".utf8))
-            exit(2)
-        }
-
+    private static func previewHUD() {
         let application = NSApplication.shared
         application.setActivationPolicy(.accessory)
         let controller = DictationController.shared
-
+        let settings = SettingsStore.shared.settings
+        print("\(settings.hudPosition.label), \(settings.showLiveText ? "with text" : "dot only")")
         Task { @MainActor in
-            for style in styles {
-                print("→ \(style.displayName): \(style.detail)")
-                HUDController.shared.preview(controller: controller, style: style)
-                try? await Task.sleep(for: .seconds(5.5))
-            }
+            HUDController.shared.preview(controller: controller, settings: settings)
+            try? await Task.sleep(for: .seconds(4.5))
             HUDController.shared.hide()
             try? await Task.sleep(for: .milliseconds(300))
             exit(0)
@@ -89,7 +75,7 @@ enum MonsieurApp {
           --check                    show configuration and permission status
           --process "text" [-v]      run only the rewriting stage on some text
           --transcribe file.wav      run a file through transcription + rewriting
-          --preview-style [name|all] show the overlay designs with sample text
+          --preview-hud              show the overlay where the settings put it
           --probe-focus              report what every app exposes as its focused element
           --signal <start|stop|toggle|toggleVerbatim|cancel>
                                      drive the running app from a script

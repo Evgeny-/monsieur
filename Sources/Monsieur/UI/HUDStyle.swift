@@ -50,59 +50,42 @@ struct HUDModel: Equatable {
         level: 0.5)
 }
 
-/// The available HUD designs. Adding a case here and a branch in `makeView`
-/// is all it takes to add another; the menu switcher is generated from
-/// `allCases`.
-enum HUDStyleID: String, Codable, CaseIterable {
-    case minimal
-    case classic
-    case frosted
-    case teleprompter
-    case waveform
+/// Where the overlay sits on screen.
+///
+/// Configurable because there is no safe default: wherever it goes it covers
+/// something, and only the person looking at the screen knows what they can
+/// afford to lose sight of.
+enum HUDPosition: String, Codable, CaseIterable {
+    case topLeft, topCenter, topRight
+    case bottomLeft, bottomCenter, bottomRight
 
-    var displayName: String {
+    var label: String {
         switch self {
-        case .classic: return "Classic"
-        case .minimal: return "Minimal"
-        case .frosted: return "Frosted"
-        case .teleprompter: return "Teleprompter"
-        case .waveform: return "Waveform"
+        case .topLeft: return "Top left"
+        case .topCenter: return "Top"
+        case .topRight: return "Top right"
+        case .bottomLeft: return "Bottom left"
+        case .bottomCenter: return "Bottom"
+        case .bottomRight: return "Bottom right"
         }
     }
 
-    var detail: String {
-        switch self {
-        case .classic: return "Pill with a status line and a level meter"
-        case .minimal: return "Just the words, no chrome"
-        case .frosted: return "Heavier translucency and vibrancy"
-        case .teleprompter: return "Two lines that scroll upward as you speak"
-        case .waveform: return "Wide, low bar driven by the input level"
-        }
-    }
+    /// Inset from the screen's usable edges.
+    private var margin: CGFloat { 24 }
 
-    /// The panel is sized to this, and designs should fill it exactly rather
-    /// than hugging their content: a container that resizes as words arrive
-    /// jitters a few pixels on every update, which is far more distracting
-    /// than a little empty space.
-    var preferredSize: CGSize {
+    func origin(for size: CGSize, in visible: CGRect) -> CGPoint {
+        let x: CGFloat
         switch self {
-        case .classic: return CGSize(width: 420, height: 76)
-        case .minimal: return CGSize(width: 420, height: 44)
-        case .frosted: return CGSize(width: 400, height: 60)
-        case .teleprompter: return CGSize(width: 460, height: 51)
-        case .waveform: return CGSize(width: 380, height: 56)
+        case .topLeft, .bottomLeft: x = visible.minX + margin
+        case .topCenter, .bottomCenter: x = visible.midX - size.width / 2
+        case .topRight, .bottomRight: x = visible.maxX - size.width - margin
         }
-    }
-
-    @ViewBuilder
-    func makeView(model: HUDModel) -> some View {
+        let y: CGFloat
         switch self {
-        case .classic: ClassicHUD(model: model)
-        case .minimal: MinimalHUD(model: model)
-        case .frosted: FrostedHUD(model: model)
-        case .teleprompter: TeleprompterHUD(model: model)
-        case .waveform: WaveformHUD(model: model)
+        case .topLeft, .topCenter, .topRight: y = visible.maxY - size.height - margin
+        case .bottomLeft, .bottomCenter, .bottomRight: y = visible.minY + margin
         }
+        return CGPoint(x: x, y: y)
     }
 }
 

@@ -74,8 +74,11 @@ That rewrite runs on **Anthropic**, **OpenAI**, or anything on **OpenRouter**,
 and is optional; without it you get the raw transcript.
 
 Roughly a second and a half from the moment you stop speaking, on a small model.
-Configuration is a readable JSON file you can edit by hand. There are five
-on-screen overlay designs if you care, and it stays out of the way if you don't.
+Configuration is a readable JSON file you can edit by hand.
+
+While you talk, a small overlay shows what is being heard. Put it in any corner,
+or turn the text off and leave a dot that reacts to your voice — wherever it
+sits it covers something, so it is yours to place.
 
 ## Development
 

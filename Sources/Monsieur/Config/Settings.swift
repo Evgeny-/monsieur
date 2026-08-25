@@ -173,7 +173,11 @@ struct Settings: Codable, Equatable {
     var copyOnly: Bool = false
     var playSounds: Bool = true
     var showHUD: Bool = true
-    var hudStyle: HUDStyleID = .minimal
+    /// Whether the overlay shows what is being heard, or only that it is
+    /// listening. The transcript is reassuring but it is also the thing that
+    /// needs the space; without it the overlay is a dot.
+    var showLiveText: Bool = true
+    var hudPosition: HUDPosition = .bottomCenter
     /// Keeps a text label beside the menu bar icon. Off by default, but a
     /// crowded menu bar makes a lone monochrome glyph genuinely hard to find.
     var showMenuBarLabel: Bool = false
@@ -193,7 +197,7 @@ struct Settings: Codable, Equatable {
         case stopPhrases, autoStopOnSilence, silenceSeconds, maxRecordingSeconds
         case hotkey, hotkeyMode, rawHotkey
         case pasteViaClipboard, copyOnly, playSounds, showHUD, keepHistory
-        case hudStyle, showMenuBarLabel
+        case showLiveText, hudPosition, showMenuBarLabel
     }
 
     init() {}
@@ -242,7 +246,8 @@ struct Settings: Codable, Equatable {
         copyOnly = v(.copyOnly, d.copyOnly)
         playSounds = v(.playSounds, d.playSounds)
         showHUD = v(.showHUD, d.showHUD)
-        hudStyle = v(.hudStyle, d.hudStyle)
+        showLiveText = v(.showLiveText, d.showLiveText)
+        hudPosition = v(.hudPosition, d.hudPosition)
         showMenuBarLabel = v(.showMenuBarLabel, d.showMenuBarLabel)
         keepHistory = v(.keepHistory, d.keepHistory)
     }

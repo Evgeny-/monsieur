@@ -108,9 +108,17 @@ struct SettingsDecodingTests {
         #expect(settings.sttProvider == Settings().sttProvider)
     }
 
-    @Test func invalidHUDStyleRawValueFallsBackToDefault() throws {
-        let settings = try decode(#"{"hudStyle": "holographic"}"#)
-        #expect(settings.hudStyle == Settings().hudStyle)
+    @Test func invalidHUDPositionRawValueFallsBackToDefault() throws {
+        let settings = try decode(#"{"hudPosition": "orbiting"}"#)
+        #expect(settings.hudPosition == Settings().hudPosition)
+    }
+
+    @Test func aSettingsFileFromBeforeTheOverlayWasSimplifiedStillLoads() throws {
+        // `hudStyle` named one of five overlay designs and no longer exists.
+        // A file written by an older build must not fail to load over it.
+        let settings = try decode(#"{"hudStyle": "teleprompter", "showLiveText": false}"#)
+        #expect(settings.showLiveText == false)
+        #expect(settings.hudPosition == Settings().hudPosition)
     }
 
     @Test func glossaryOfWrongShapeFallsBackToEmpty() throws {

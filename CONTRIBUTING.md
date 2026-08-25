@@ -56,27 +56,19 @@ Sources/Monsieur/
   Config/       settings model and its file-watching store
 ```
 
-## Adding a HUD design
+## The overlay
 
-Overlay designs are one file each, switchable from the menu bar and
-previewable in one shot with `.build/debug/Monsieur --preview-style all`
-(README.md › Diagnostics). To add one:
+The overlay is one view, `Sources/Monsieur/UI/MonsieurHUD.swift`, in two sizes:
+with the transcript, or a dot that reacts to your voice. There were five designs
+once, switchable at runtime; the one that got used was the one that said the
+least, and each of the others was another thing to keep working through every
+change underneath. `TranscriptText` and `VisualEffectBackground` in
+`HUDStyle.swift` carry the committed-versus-partial text rendering and the
+frosted-glass background. Preview a change without dictating:
 
-1. Add a case to `HUDStyleID` in `Sources/Monsieur/UI/HUDStyle.swift`.
-   `displayName`, `detail`, and `preferredSize` are all switches over this
-   enum, so the compiler will point at every place that now needs a branch.
-2. Add a file in `Sources/Monsieur/UI/HUDStyles/` with a `View` that takes
-   an `HUDModel` -- look at the existing five for the shape. Reuse
-   `TranscriptText` and `VisualEffectBackground` from `HUDStyle.swift` rather
-   than reimplementing committed/partial text rendering or the frosted-glass
-   background.
-3. Add the case to `makeView(model:)`'s switch, also in `HUDStyle.swift`.
-
-The menu switcher and the Settings picker are both generated from
-`HUDStyleID.allCases`, so a new case appears in both without further wiring.
-Render committed words solid and in-flight words dimmed -- the recogniser
-revises the tail of a sentence as it listens, and every existing design is
-honest about which words have actually settled.
+```bash
+.build/debug/Monsieur --preview-hud
+```
 
 ## Secrets
 

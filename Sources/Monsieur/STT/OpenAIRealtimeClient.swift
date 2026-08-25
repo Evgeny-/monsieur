@@ -212,9 +212,17 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
             // really is 24 kHz.
             "format": ["type": "audio/pcm", "rate": 24_000],
             "transcription": transcription,
-            // See the class doc comment for why this is `null` rather than
-            // `server_vad`.
-            "turn_detection": NSNull(),
+            // Server-side voice activity detection, which is what makes text
+            // appear during a dictation at all. Checked against the live API
+            // rather than taken on trust: with turn detection off, nothing
+            // arrives until an explicit commit, so the overlay stayed empty for
+            // the whole recording. With it on, each utterance is transcribed
+            // the moment you pause -- 23 deltas in 170ms once speech ends.
+            //
+            // Note this is not the same shape of "live" as ElevenLabs, which
+            // revises a partial while you are still talking. Here the text
+            // appears a phrase at a time, at each pause.
+            "turn_detection": ["type": "server_vad"],
         ]
 
         return [

@@ -33,7 +33,6 @@ final class MenuBarController {
         SettingsStore.shared.$settings
             .receive(on: RunLoop.main)
             .sink { [weak self] settings in
-                self?.rebuildStyleMenu(selected: settings.hudStyle)
                 self?.applyLabel(settings.showMenuBarLabel)
                 self?.refreshHotkeyTitles(settings)
             }
@@ -132,7 +131,7 @@ final class MenuBarController {
     // MARK: - Menu
 
     private enum MenuTag: Int {
-        case toggle = 1, status = 2, verbatim = 3, styleRoot = 4
+        case toggle = 1, status = 2, verbatim = 3
         case cancel = 5, copyLast = 6
     }
 
@@ -170,11 +169,6 @@ final class MenuBarController {
 
         menu.addItem(.separator())
 
-        let styleRoot = NSMenuItem(title: "Overlay style", action: nil, keyEquivalent: "")
-        styleRoot.tag = MenuTag.styleRoot.rawValue
-        styleRoot.submenu = NSMenu()
-        menu.addItem(styleRoot)
-
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
@@ -192,9 +186,7 @@ final class MenuBarController {
         // and Copy when there is nothing to copy.
         menu.autoenablesItems = false
         statusItem.menu = menu
-        let current = SettingsStore.shared.settings
-        rebuildStyleMenu(selected: current.hudStyle)
-        refreshHotkeyTitles(current)
+        refreshHotkeyTitles(SettingsStore.shared.settings)
     }
 
     private func refreshHotkeyTitles(_ settings: Settings) {
@@ -205,21 +197,6 @@ final class MenuBarController {
                 + (hotkey.isEmpty ? "" : "   \(hotkey)")
         }
         render(controller.state)
-    }
-
-    private func rebuildStyleMenu(selected: HUDStyleID) {
-        guard let root = statusItem.menu?.item(withTag: MenuTag.styleRoot.rawValue),
-              let submenu = root.submenu else { return }
-        submenu.removeAllItems()
-        for style in HUDStyleID.allCases {
-            let item = NSMenuItem(title: style.displayName,
-                                  action: #selector(pickStyle(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = style.rawValue
-            item.state = style == selected ? .on : .off
-            item.toolTip = style.detail
-            submenu.addItem(item)
-        }
     }
 
     // MARK: - Actions
@@ -233,16 +210,9 @@ final class MenuBarController {
         TextInserter.copyToClipboard(last)
     }
 
-    @objc private func pickStyle(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let style = HUDStyleID(rawValue: raw) else { return }
-        SettingsStore.shared.settings.hudStyle = style
-        // Show it straight away: picking a design you cannot see until the next
-        // time you dictate is not a choice, it is a guess.
-        HUDController.shared.preview(controller: controller, style: style)
+    @objc private func openOnboarding() {
+        OnboardingWindowController.shared.present()
     }
-
-    @objc private func openOnboarding() { OnboardingWindowController.shared.present() }
 
     @objc func openSettings() {
         if settingsWindow == nil {

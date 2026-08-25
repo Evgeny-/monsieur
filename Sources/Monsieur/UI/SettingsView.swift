@@ -61,13 +61,18 @@ private struct GeneralTab: View {
                 Toggle("Play sounds", isOn: $store.settings.playSounds)
                 Toggle("Show the on-screen indicator", isOn: $store.settings.showHUD)
                 if store.settings.showHUD {
-                    Picker("Overlay style", selection: $store.settings.hudStyle) {
-                        ForEach(HUDStyleID.allCases, id: \.self) { style in
-                            Text(style.displayName).tag(style)
+                    Picker("Position", selection: $store.settings.hudPosition) {
+                        ForEach(HUDPosition.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    Toggle("Show what is being heard", isOn: $store.settings.showLiveText)
+                        .help("Off leaves a small dot that reacts to your voice. Wherever the overlay sits it covers something, and the transcript is the part that needs the room.")
+                    HStack {
+                        Spacer()
+                        Button("Preview") {
+                            HUDController.shared.preview(controller: .shared,
+                                                         settings: store.settings)
                         }
                     }
-                    Text(store.settings.hudStyle.detail)
-                        .font(.caption2).foregroundStyle(.secondary)
                 }
                 Toggle("Label the menu bar icon", isOn: $store.settings.showMenuBarLabel)
                     .help("Puts the app name beside the icon. A lone monochrome glyph is easy to lose in a crowded menu bar.")

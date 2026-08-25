@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch state {
         case .recording, .working, .failed:
             HUDController.shared.show(controller: controller,
-                                      style: SettingsStore.shared.settings.hudStyle)
+                                      settings: SettingsStore.shared.settings)
         case .idle:
             // Gone at once. The lingering "done" state was showing an empty
             // overlay with a tick in it for most of a second after the text had
