@@ -76,7 +76,7 @@ struct OnboardingView: View {
             // Only trust settings on disk if a previous run of this wizard
             // actually wrote them -- see the property comment above.
             if store.settings.hasCompletedSetup {
-                chosenLanguageID = LanguagePreset.matching(code: store.settings.sttLanguage)?.id
+                chosenLanguageID = store.settings.languagePreset
             }
         }
     }
@@ -166,6 +166,8 @@ struct OnboardingView: View {
                     Text(preset.displayName).tag(preset.id as String?)
                 }
             }
+            Text("Only picks the words that stop a recording and introduce a spoken instruction. Speech is understood in any language either way.")
+                .font(.caption2).foregroundStyle(.secondary)
         }
 
     // MARK: - 3. Rewriting (optional)

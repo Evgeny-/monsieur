@@ -88,15 +88,20 @@ struct Settings: Codable, Equatable {
     /// OpenAI's streaming transcription model. `whisper-1` is batch only and
     /// cannot be used here.
     var openAISTTModel: String = "gpt-4o-transcribe"
-    /// The realtime *session* model, which is a different thing from the
-    /// transcription model and goes in a different place: this one names the
-    /// session in the connection URL, while `openAISTTModel` is passed inside
-    /// it as `audio.input.transcription.model`. Putting a transcription model
-    /// here is rejected outright.
-    var openAIRealtimeModel: String = "gpt-realtime-1.5"
+    /// Which `LanguagePreset` supplied the stop phrases and command triggers.
+    /// Deliberately separate from `sttLanguage`: knowing what you speak is
+    /// useful for choosing those words, and is not a reason to constrain the
+    /// recogniser.
+    var languagePreset: String = "eng"
     /// False until the first-run setup has been completed.
     var hasCompletedSetup: Bool = false
-    /// ISO-639 code to pin the spoken language, or nil to auto-detect.
+    /// Pins the recogniser to one language. Normally nil, and normally should
+    /// be: both services detect language automatically, and pinning is enforced
+    /// rather than preferred -- speak something else and the recogniser forces
+    /// what it hears into the pinned language instead of saying so. Which is
+    /// the opposite of what this app is for.
+    ///
+    /// ISO-639 code, or nil to auto-detect.
     /// Pinning is more accurate if you always dictate in the same language;
     /// see `LanguagePreset` for the codes and phrases that ship with it.
     var sttLanguage: String? = nil
@@ -178,7 +183,8 @@ struct Settings: Codable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case elevenLabsAPIKey, sttModel, sttLanguage, removeFillerWords
-        case sttProvider, openAISTTModel, openAIRealtimeModel, hasCompletedSetup
+        case sttProvider, openAISTTModel, hasCompletedSetup
+        case languagePreset
         case llmProvider, openAIAPIKey, openAIModel, openAIReasoningEffort
         case anthropicAPIKey, anthropicModel, anthropicEffort
         case openRouterAPIKey, openRouterModel
@@ -200,8 +206,8 @@ struct Settings: Codable, Equatable {
         }
         sttProvider = v(.sttProvider, d.sttProvider)
         openAISTTModel = v(.openAISTTModel, d.openAISTTModel)
-        openAIRealtimeModel = v(.openAIRealtimeModel, d.openAIRealtimeModel)
         hasCompletedSetup = v(.hasCompletedSetup, d.hasCompletedSetup)
+        languagePreset = v(.languagePreset, d.languagePreset)
         elevenLabsAPIKey = v(.elevenLabsAPIKey, d.elevenLabsAPIKey)
         sttModel = v(.sttModel, d.sttModel)
         sttLanguage = (try? c.decodeIfPresent(String.self, forKey: .sttLanguage)) ?? nil

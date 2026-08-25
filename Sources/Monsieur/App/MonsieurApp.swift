@@ -91,7 +91,7 @@ enum MonsieurApp {
           --transcribe file.wav      run a file through transcription + rewriting
           --preview-style [name|all] show the overlay designs with sample text
           --probe-focus              report what every app exposes as its focused element
-          --signal <toggle|toggleVerbatim|cancel>
+          --signal <start|stop|toggle|toggleVerbatim|cancel>
                                      drive the running app from a script
 
         """.utf8))

@@ -3,9 +3,9 @@ import Foundation
 /// Streams microphone audio to OpenAI's Realtime API, configured as a
 /// transcription-only session, over a websocket.
 ///
-/// Protocol (`wss://api.openai.com/v1/realtime`, GA interface -- the older
-/// beta interface, which used an `intent=transcription` query parameter and
-/// an `OpenAI-Beta: realtime=v1` header, was retired in May 2026):
+/// Protocol (`wss://api.openai.com/v1/realtime?intent=transcription`; the
+/// `OpenAI-Beta: realtime=v1` header the old beta needed is gone, but the
+/// intent parameter itself is very much alive -- checked against the API):
 ///   client -> `{"type":"session.update","session":{"type":"transcription",...}}`   (once, right after connecting)
 ///             `{"type":"input_audio_buffer.append","audio":<base64 PCM16>}`        (per chunk)
 ///             `{"type":"input_audio_buffer.commit"}`                               (see below)
@@ -100,6 +100,9 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
         guard !settings.openAIAPIKey.isEmpty else { throw SpeechError.missingAPIKey("OpenAI") }
 
         self.settings = settings
+        // Start from what this model has already refused, so a field known to
+        // be unsupported is not offered again just to be turned down again.
+        droppedFields = Self.knownRefusals(for: settings.openAISTTModel)
         committedSegments = []
         latestPartial = ""
         currentItemID = nil
@@ -116,15 +119,22 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
     }
 
     private func openSocket(settings: Settings) throws {
-        // Two different models, in two different places. The query string names
-        // the *session* model and must be a realtime one; the transcription
-        // model goes inside, as audio.input.transcription.model. Passing the
-        // transcription model here is refused by name: "gpt-4o-transcribe is a
-        // transcription model and cannot be used as the realtime session
-        // model".
+        // A transcription-only session, asked for by intent. Verified against
+        // the live API rather than inferred: `?intent=transcription` with
+        // `session.type = "transcription"` returns transcripts, and needs no
+        // model in the URL at all.
+        //
+        // Two wrong turns preceded this. Connecting with no query parameters is
+        // refused ("You must provide a model parameter"), which invites putting
+        // the transcription model there -- refused in turn, because that slot
+        // names the *session* model and wants a realtime one. Putting a realtime
+        // model there does work, but then the session is a realtime session and
+        // a transcription session.update is rejected as mismatched. Intent
+        // sidesteps the whole question and does not tie us to a realtime model
+        // name that can change under us.
         var components = URLComponents(string: "wss://api.openai.com/v1/realtime")
         components?.queryItems = [
-            URLQueryItem(name: "model", value: settings.openAIRealtimeModel),
+            URLQueryItem(name: "intent", value: "transcription"),
         ]
         guard let url = components?.url else { throw SpeechError.badURL }
 
@@ -146,8 +156,25 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
         receiveLoop(task)
     }
 
-    /// Session fields the server has refused this session; omitted on resend.
+    /// Session fields the server has refused; omitted on resend.
     private var droppedFields: Set<String> = []
+
+    /// Remembered for the life of the process, per transcription model. Which
+    /// fields a model accepts does not change between one dictation and the
+    /// next, and without this every single recording pays a rejected request
+    /// and a resend before it can start listening.
+    private static var refusedByModel: [String: Set<String>] = [:]
+    private static let refusalLock = NSLock()
+
+    private static func knownRefusals(for model: String) -> Set<String> {
+        refusalLock.lock(); defer { refusalLock.unlock() }
+        return refusedByModel[model] ?? []
+    }
+
+    private static func remember(_ field: String, refusedBy model: String) {
+        refusalLock.lock(); defer { refusalLock.unlock() }
+        refusedByModel[model, default: []].insert(field)
+    }
 
     /// Recognises "The 'x' parameter is not supported…" and returns `x`.
     /// Internal rather than private so the string matching can be tested: it is
@@ -447,6 +474,9 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
             // hypothetical.
             if let field = Self.rejectedField(in: message), !droppedFields.contains(field) {
                 droppedFields.insert(field)
+                if let model = settings?.openAISTTModel {
+                    Self.remember(field, refusedBy: model)
+                }
                 Log.stt.info("server refused '\(field, privacy: .public)'; resending session config without it")
                 if let task, let settings { sendSessionUpdate(settings: settings, on: task) }
                 return

@@ -66,11 +66,12 @@ recorder=$!
 # anything appears.
 sleep 4
 
-"$APP" --signal toggle          # start dictating
+"$APP" --signal start           # explicit, not a toggle: a toggle arriving
+                                # while the app is still busy desynchronises
 sleep 0.8
 afplay "$SPEECH"
 sleep 1.2
-"$APP" --signal toggle          # stop; transcription settles, then the rewrite
+"$APP" --signal stop            # transcription settles, then the rewrite
 
 wait "$recorder" 2>/dev/null || true
 

@@ -127,6 +127,7 @@ func importEnvFile(into store: SettingsStore) {
 
 private struct TranscriptionTab: View {
     @ObservedObject var store: SettingsStore
+    @State private var showLanguageOverride = false
 
     var body: some View {
         Form {
@@ -149,10 +150,8 @@ private struct TranscriptionTab: View {
                         .help("scribe_v2_realtime is the low-latency streaming model.")
                 case .openai:
                     SecretField(title: "OpenAI API key", text: $store.settings.openAIAPIKey)
-                    TextField("Transcription model", text: $store.settings.openAISTTModel)
+                    TextField("Model", text: $store.settings.openAISTTModel)
                         .help("gpt-4o-transcribe or gpt-4o-mini-transcribe. whisper-1 is batch only and cannot stream.")
-                    TextField("Session model", text: $store.settings.openAIRealtimeModel)
-                        .help("The realtime session this runs inside — a different thing from the transcription model, and it must be a realtime model.")
                 }
                 if !store.settings.sttProvider.isConfigured(store.settings) {
                     Label("No API key for this provider — dictation will fail.",
@@ -162,12 +161,22 @@ private struct TranscriptionTab: View {
             }
             Section("Recognition") {
                 LanguagePresetRow(settings: $store.settings)
-                Text("Also offers to update the stop phrases (General → Stopping) and command trigger words (Rewriting → Spoken commands) to match.")
+                Text("Sets the stop phrases (General → Stopping) and command trigger words (Rewriting → Spoken commands). It does not limit what speech is understood.")
                     .font(.caption2).foregroundStyle(.secondary)
-                TextField("Language code", text: Binding(
-                    get: { store.settings.sttLanguage ?? "" },
-                    set: { store.settings.sttLanguage = $0.isEmpty ? nil : $0 }))
-                    .help("ISO 639 code such as rus or eng. Leave empty to auto-detect. Pinning is more accurate when you always speak one language — but it is enforced, not preferred: speak another and the recogniser forces what it hears into the pinned one rather than telling you.")
+
+                DisclosureGroup(isExpanded: $showLanguageOverride) {
+                    TextField("Force language", text: Binding(
+                        get: { store.settings.sttLanguage ?? "" },
+                        set: { store.settings.sttLanguage = $0.isEmpty ? nil : $0 }))
+                        .help("ISO 639 code such as rus or eng. Empty means detect automatically, which is almost always what you want.")
+                    Text("Both services detect the language themselves. Forcing one is enforced rather than preferred: say something in another language and the recogniser bends what it hears into this one instead of telling you. Worth it only if you never speak anything else and need the last few points of accuracy.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                } label: {
+                    Text("Force a single language")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture { withAnimation { showLanguageOverride.toggle() } }
+                }
                 Toggle("Drop filler words", isOn: $store.settings.removeFillerWords)
                     .help("Sends no_verbatim, which removes 'um', 'uh', 'like' and false starts at the recogniser level.")
                 HStack {
@@ -192,7 +201,7 @@ private struct TranscriptionTab: View {
     }
 }
 
-/// Picks a language preset and pins `sttLanguage` to it. Optionally offers to
+/// Picks the language whose stop phrases and command triggers to use. Offers to
 /// also swap in that language's stop phrases and command trigger words -- but
 /// only with confirmation, since those may have been hand-edited. Not shown:
 /// picking the language a user is already on (or one with identical phrases,
@@ -205,7 +214,7 @@ struct LanguagePresetRow: View {
     /// The preset matching what's currently pinned, or nil for a hand-typed
     /// code that isn't one of ours -- the picker shows that as "Custom"
     /// rather than silently snapping to something else.
-    private var current: LanguagePreset? { LanguagePreset.matching(code: settings.sttLanguage) }
+    private var current: LanguagePreset? { LanguagePreset.all.first { $0.id == settings.languagePreset } }
 
     var body: some View {
         Picker("Language preset", selection: Binding(

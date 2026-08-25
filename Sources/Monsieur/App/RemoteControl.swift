@@ -12,6 +12,14 @@ enum RemoteControl {
     enum Command: String, CaseIterable {
         case toggle = "dev.enikiforov.monsieur.toggle"
         case toggleVerbatim = "dev.enikiforov.monsieur.toggleVerbatim"
+        /// Explicit start and stop, for callers that cannot see the current
+        /// state. A toggle desynchronises the moment one arrives while the app
+        /// is still finishing the previous dictation: the caller believes it
+        /// started a recording and actually stopped nothing, then the next
+        /// toggle starts one over whatever silence follows. That produced
+        /// transcripts of rooms nobody was speaking in.
+        case start = "dev.enikiforov.monsieur.start"
+        case stop = "dev.enikiforov.monsieur.stop"
         case cancel = "dev.enikiforov.monsieur.cancel"
     }
 
@@ -27,6 +35,8 @@ enum RemoteControl {
                     switch command {
                     case .toggle: controller.toggle()
                     case .toggleVerbatim: controller.toggle(bypassLLM: true)
+                    case .start: controller.start()
+                    case .stop: controller.stop()
                     case .cancel: controller.cancel()
                     }
                 }

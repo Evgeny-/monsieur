@@ -137,9 +137,13 @@ extension LanguagePreset {
     /// callers decide whether the result actually replaces anything, which
     /// keeps this safe to call speculatively (e.g. from a confirmation
     /// dialog's two buttons) without committing to either outcome up front.
+    /// Applies the words, not the recogniser. Choosing "French" here means
+    /// "these are the phrases I will say to stop and to give instructions" --
+    /// not "refuse to understand anything else". Pinning the recogniser is a
+    /// separate, deliberate override; see `Settings.sttLanguage`.
     func applied(to settings: Settings, replacePhrases: Bool) -> Settings {
         var result = settings
-        result.sttLanguage = sttLanguageCode
+        result.languagePreset = id
         if replacePhrases {
             result.stopPhrases = stopPhrases
             result.commandTriggers = commandTriggers
