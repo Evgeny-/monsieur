@@ -14,17 +14,23 @@ CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 [ -x "$CHROME" ] || { echo "Google Chrome not found"; exit 1; }
 
 # Screen size in points, so the window reaches the bottom edge.
-read -r W H <<< "$(python3 -c "
+read -r SCREEN_W H <<< "$(python3 -c "
 import subprocess, re
 out = subprocess.run(['system_profiler','SPDisplaysDataType'], capture_output=True, text=True).stdout
 m = re.search(r'Resolution: (\d+) x (\d+)', out)
 print(int(m.group(1)) // 2, int(m.group(2)) // 2)")"
 
+# Narrower than the screen, and centred: the overlay is positioned relative to
+# the display, so an off-centre window would put it off-centre over the page.
+W="${SCENE_WIDTH:-$(( SCREEN_W * 8 / 10 ))}"
+X=$(( (SCREEN_W - W) / 2 ))
+echo "$W $X $H" > /tmp/monsieur-scene-geometry
+
 pkill -f "user-data-dir=$PROFILE" 2>/dev/null || true
 sleep 0.5
 "$CHROME" --user-data-dir="$PROFILE" \
     --app="file://$PWD/docs/demo/scene.html" \
-    --window-position=0,0 --window-size="$W,$H" \
+    --window-position="$X,0" --window-size="$W,$H" \
     --no-first-run --no-default-browser-check --hide-crash-restore-bubble \
     >/dev/null 2>&1 &
 sleep 3

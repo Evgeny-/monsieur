@@ -59,9 +59,12 @@ echo "==> Opening the scene"
 Scripts/open-scene.sh
 
 echo "==> Recording"
-screencapture -v -g -V 22 -x "$OUT" &
+screencapture -v -g -V 26 -x "$OUT" &
 recorder=$!
-sleep 2
+# Four seconds, not two: roughly half of it is consumed before the first frame
+# is actually captured, and the rest is the beat of ordinary page before
+# anything appears.
+sleep 4
 
 "$APP" --signal toggle          # start dictating
 sleep 0.8
@@ -89,9 +92,13 @@ if [ -n "$rect" ]; then
 scale = 2                      # points to pixels on this display
 bottom = ($hy + $hh + 8) * scale
 height = 780 * scale           # enough to keep the channel list whole
-width  = 1440 * scale          # stops short of the Dock, which is
-                               # somebody's personal set of apps
-print(f'{width}:{height}:0:{max(0, bottom - height)}')
+# Framed to the window, not the display: the window is narrower than the
+# screen and centred, and open-scene.sh writes its geometry out so this does
+# not have to assume either.
+geom = open('/tmp/monsieur-scene-geometry').read().split()
+width  = int(geom[0]) * scale
+left   = int(geom[1]) * scale
+print(f'{width}:{height}:{left}:{max(0, bottom - height)}')
 ")
 else
     CROP="${CROP:-2360:1400:0:420}"
@@ -103,7 +110,7 @@ ffmpeg -v error -i "$OUT" -vf "crop=$CROP" -c:v h264 -crf 20 -c:a aac \
 mv "${OUT%.mov}-cropped.mp4" "${OUT%.mov}.mp4"
 # Trimmed: everything after the paste is dead air, and a README video that
 # outlasts its own point does not get watched twice.
-ffmpeg -v error -i "${OUT%.mov}.mp4" -t 15 -c:v libx264 -crf 22 -preset slow \
+ffmpeg -v error -i "${OUT%.mov}.mp4" -t 17 -c:v libx264 -crf 22 -preset slow \
        -c:a aac -b:a 128k "${OUT%.mov}-t.mp4" -y
 mv "${OUT%.mov}-t.mp4" "${OUT%.mov}.mp4"
 rm -f "$OUT"

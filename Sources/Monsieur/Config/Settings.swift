@@ -94,7 +94,7 @@ struct Settings: Codable, Equatable {
     /// Pinning is more accurate if you always dictate in the same language;
     /// see `LanguagePreset` for the codes and phrases that ship with it.
     var sttLanguage: String? = nil
-    /// Strips "эм", "ну", "like", false starts at the recogniser level.
+    /// Strips "um", "uh", "like", false starts at the recogniser level.
     var removeFillerWords: Bool = true
 
     // -- Post-processing (LLM) ------------------------------------------

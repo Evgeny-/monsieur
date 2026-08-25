@@ -167,7 +167,7 @@ private struct TranscriptionTab: View {
                     set: { store.settings.sttLanguage = $0.isEmpty ? nil : $0 }))
                     .help("ISO 639 code such as rus or eng. Leave empty to auto-detect. Pinning is more accurate when you always speak one language — but it is enforced, not preferred: speak another and the recogniser forces what it hears into the pinned one rather than telling you.")
                 Toggle("Drop filler words", isOn: $store.settings.removeFillerWords)
-                    .help("Sends no_verbatim, which removes 'эм', 'ну', 'like' and false starts at the recogniser level.")
+                    .help("Sends no_verbatim, which removes 'um', 'uh', 'like' and false starts at the recogniser level.")
                 HStack {
                     Text("Recording cap")
                     Spacer()
