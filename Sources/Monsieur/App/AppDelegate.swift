@@ -82,11 +82,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             HUDController.shared.show(controller: controller,
                                       style: SettingsStore.shared.settings.hudStyle)
         case .idle:
-            // Let the "Done" tick linger for a beat before it disappears.
-            Task {
-                try? await Task.sleep(for: .milliseconds(700))
-                if case .idle = self.controller.state { HUDController.shared.hide() }
-            }
+            // Gone at once. The lingering "done" state was showing an empty
+            // overlay with a tick in it for most of a second after the text had
+            // already landed -- the transcript is cleared by then, so there was
+            // nothing in it to read. The text appearing where you were typing
+            // is the confirmation; a pill announcing the same thing afterwards
+            // just looks like something failed to close.
+            HUDController.shared.hide()
         }
     }
 }
