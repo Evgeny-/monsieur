@@ -6,7 +6,10 @@
 
 Dictation for macOS that hands you the language you needed, not the one you thought in.
 
-<img src="docs/screenshots/minimal.png" width="620" alt="Monsieur transcribing French">
+<img src="docs/demo/demo.gif" width="720" alt="A French sentence spoken aloud, arriving as English in an ordinary web app">
+
+<sub>Spoken in French, typed in English, into an app that has never heard of Monsieur.
+<a href="docs/demo/demo.mp4">Same clip with sound</a>.</sub>
 
 </div>
 

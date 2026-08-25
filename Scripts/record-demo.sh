@@ -85,5 +85,17 @@ CROP="${CROP:-1620:830:640:1000}"
 ffmpeg -v error -i "$OUT" -vf "crop=$CROP" -c:v h264 -crf 20 -c:a aac \
        "${OUT%.mov}-cropped.mp4" -y
 mv "${OUT%.mov}-cropped.mp4" "${OUT%.mov}.mp4"
+# Trimmed: everything after the paste is dead air, and a README video that
+# outlasts its own point does not get watched twice.
+ffmpeg -v error -i "${OUT%.mov}.mp4" -t 15 -c:v libx264 -crf 22 -preset slow \
+       -c:a aac -b:a 128k "${OUT%.mov}-t.mp4" -y
+mv "${OUT%.mov}-t.mp4" "${OUT%.mov}.mp4"
 rm -f "$OUT"
+# GitHub strips <video> from a README, so the inline version has to be a GIF;
+# the mp4 stays for the audio, which is half the point -- you hear French.
+ffmpeg -v error -i "${OUT%.mov}.mp4" -vf "fps=12,scale=860:-1:flags=lanczos,palettegen=stats_mode=diff" -y /tmp/monsieur-pal.png
+ffmpeg -v error -i "${OUT%.mov}.mp4" -i /tmp/monsieur-pal.png \
+  -lavfi "fps=12,scale=860:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3" \
+  -y "${OUT%.mov}.gif"
+
 echo "==> Wrote ${OUT%.mov}.mp4 ($(du -h "${OUT%.mov}.mp4" | cut -f1), spoken line ${DURATION}s)"
