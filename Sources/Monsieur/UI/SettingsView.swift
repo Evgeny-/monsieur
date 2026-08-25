@@ -149,8 +149,10 @@ private struct TranscriptionTab: View {
                         .help("scribe_v2_realtime is the low-latency streaming model.")
                 case .openai:
                     SecretField(title: "OpenAI API key", text: $store.settings.openAIAPIKey)
-                    TextField("Model", text: $store.settings.openAISTTModel)
+                    TextField("Transcription model", text: $store.settings.openAISTTModel)
                         .help("gpt-4o-transcribe or gpt-4o-mini-transcribe. whisper-1 is batch only and cannot stream.")
+                    TextField("Session model", text: $store.settings.openAIRealtimeModel)
+                        .help("The realtime session this runs inside — a different thing from the transcription model, and it must be a realtime model.")
                 }
                 if !store.settings.sttProvider.isConfigured(store.settings) {
                     Label("No API key for this provider — dictation will fail.",

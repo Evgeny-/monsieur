@@ -116,10 +116,16 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
     }
 
     private func openSocket(settings: Settings) throws {
-        // The model belongs in the query string, not only in the session.update
-        // that follows: the server rejects the connection outright without it.
+        // Two different models, in two different places. The query string names
+        // the *session* model and must be a realtime one; the transcription
+        // model goes inside, as audio.input.transcription.model. Passing the
+        // transcription model here is refused by name: "gpt-4o-transcribe is a
+        // transcription model and cannot be used as the realtime session
+        // model".
         var components = URLComponents(string: "wss://api.openai.com/v1/realtime")
-        components?.queryItems = [URLQueryItem(name: "model", value: settings.openAISTTModel)]
+        components?.queryItems = [
+            URLQueryItem(name: "model", value: settings.openAIRealtimeModel),
+        ]
         guard let url = components?.url else { throw SpeechError.badURL }
 
         var request = URLRequest(url: url)
@@ -156,16 +162,11 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
         }
 
         let input: [String: Any] = [
-            // Input audio must be 16-bit PCM, mono, little-endian, at
-            // exactly 24 kHz -- the API documents "rate" as a fixed
-            // constant, not a configurable field. This app's capture
-            // pipeline is fixed at 16 kHz (see AudioRecorder), and per this
-            // file's brief we do not resample to bridge that gap, so the
-            // bytes `send(pcm:)` actually streams run at 2/3 of the rate
-            // declared here. Flagging this rather than quietly resampling:
-            // recognition quality will be worse than it would be over a
-            // properly resampled 24 kHz stream until the capture side
-            // changes.
+            // 16-bit PCM, mono, little-endian, at exactly 24 kHz -- the API
+            // documents "rate" as a constant, not a configurable field. The
+            // capture side resamples to whatever the chosen provider needs
+            // (see STTProvider.requiredSampleRate), so what arrives here
+            // really is 24 kHz.
             "format": ["type": "audio/pcm", "rate": 24_000],
             "transcription": transcription,
             // See the class doc comment for why this is `null` rather than
