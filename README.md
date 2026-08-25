@@ -6,7 +6,7 @@
 
 Dictation for macOS that hands you the language you needed, not the one you thought in.
 
-<video src="https://github.com/user-attachments/assets/d9bcd1aa-218e-48a1-a599-8f3af1d48ed3" controls></video>
+<video src="https://github.com/user-attachments/assets/121352e4-3b51-4688-991f-dd4c2b561cd3" controls></video>
 
 <sub>Spoken in French, typed in English, into an app that has never heard of Monsieur.</sub>
 

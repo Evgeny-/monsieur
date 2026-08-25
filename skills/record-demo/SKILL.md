@@ -121,19 +121,21 @@ into the comment box, and GitHub returns a `user-attachments` URL. Wrap that:
 <video src="https://github.com/user-attachments/assets/…" controls></video>
 ```
 
-The issue does not need to be submitted.
+**Submit the issue.** An attachment carries the permissions of the comment it
+was uploaded into, and an unsubmitted draft is visible only to whoever uploaded
+it -- for everyone else the player is a blank space. Pasting that URL into a
+different, published comment does not re-scope it; the file has to be uploaded
+into content that is actually posted. Publishing the repository afterwards does
+not help either. The issue can be closed once the URL is in the README.
 
-**Upload only once the repository is public.** An asset uploaded while it was
-private keeps those permissions afterwards -- making the repository public later
-does not retroactively open it. Checked: the same URL returned `200 video/mp4`
-with a token and `404 Not Found` without one, so a visitor saw an empty space
-where the player should be. Verify with:
+Verify from outside, with no token, rather than from a browser already signed in
+to GitHub:
 
 ```bash
 curl -sL -o /dev/null -w "%{http_code} %{content_type}\n" <asset-url>
 ```
 
-anonymously, not from a browser already signed in to GitHub.
+`200 video/mp4` is right; `404` means the asset is still private to you.
 
 After re-recording, the README still points at the *previous* upload: the asset
 URL is fixed at upload time and has no relationship to the file in the
