@@ -2,77 +2,114 @@
 <meta charset="utf-8">
 <title>Northwind</title>
 <!--
-  A stand-in for some ordinary web app you happen to be typing into. It knows
-  nothing about Monsieur, mentions no hotkey and no languages, and would behave
-  exactly the same if the app were not installed -- which is the entire claim
-  being demonstrated: this works in things that were never built for it.
+  A stand-in for some ordinary team chat you happen to be typing into. It knows
+  nothing about Monsieur: no hotkey, no languages, no branding of ours, and it
+  would behave identically with the app uninstalled. That is the whole claim
+  being demonstrated.
+
+  The canvas deepens toward the bottom on purpose. The overlay is a dark frosted
+  pill, and over flat white it reads as a grey smudge rather than as glass; a
+  mid-tone underneath it gives the blur something to be made of.
 -->
 <style>
-  :root { color-scheme: light; }
+  :root {
+    color-scheme: light;
+    --ink: #171c26; --dim: #6b7488; --line: #e4e7ee;
+    --accent: #4c5fd7;
+  }
   * { box-sizing: border-box; }
   body {
-    margin: 0; min-height: 100vh;
-    display: grid; place-items: end center; padding-bottom: 210px;
-    background: #f4f5f8;
+    margin: 0; height: 100vh; overflow: hidden;
+    display: grid; grid-template-columns: 232px 1fr;
     font: 15px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-    color: #1c2330;
+    color: var(--ink);
+    background: linear-gradient(#f7f8fb 0%, #eceff6 58%, #dfe4ee 100%);
   }
-  header {
-    position: fixed; top: 0; left: 0; right: 0; height: 54px;
-    display: flex; align-items: center; gap: 10px; padding: 0 26px;
-    background: #fff; border-bottom: 1px solid #e6e8ee;
-  }
-  .mark {
-    width: 22px; height: 22px; border-radius: 6px;
-    background: linear-gradient(135deg, #4c6ef5, #22b8cf);
-  }
-  .brand { font-weight: 600; letter-spacing: -.2px; }
-  nav { margin-left: auto; display: flex; gap: 22px; color: #7a8497; font-size: 14px; }
 
-  .composer {
-    width: 760px; background: #fff;
-    border: 1px solid #e3e6ee; border-radius: 14px;
-    box-shadow: 0 12px 40px rgba(24,34,60,.09);
-    overflow: hidden;
-  }
-  .meta {
-    display: flex; align-items: center; gap: 10px;
-    padding: 14px 20px; border-bottom: 1px solid #eef0f5;
-    color: #7a8497; font-size: 13px;
-  }
-  .chip {
-    padding: 3px 10px; border-radius: 20px;
-    background: #eef2ff; color: #3b5bdb; font-weight: 500;
-  }
-  textarea {
-    display: block; width: 100%; min-height: 128px; padding: 18px 20px;
-    border: 0; outline: 0; resize: none; font: inherit; color: inherit;
-  }
-  textarea::placeholder { color: #a9b1c1; }
-  .actions {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 16px 14px; border-top: 1px solid #eef0f5;
-  }
-  .send {
-    margin-left: auto; padding: 7px 18px; border: 0; border-radius: 8px;
-    background: #3b5bdb; color: #fff; font: inherit; font-weight: 500;
-  }
-  .ghost { color: #aeb6c4; font-size: 18px; padding: 0 4px; }
+  aside { background: #fff; border-right: 1px solid var(--line); padding: 18px 14px; }
+  .brand { display: flex; align-items: center; gap: 9px; margin: 4px 6px 22px; }
+  .mark { width: 24px; height: 24px; border-radius: 7px;
+          background: linear-gradient(140deg, #5b6ef5, #2ec5d3); }
+  .brand b { font-size: 15px; letter-spacing: -.2px; }
+  .group { color: #9aa2b4; font-size: 11px; letter-spacing: .06em;
+           text-transform: uppercase; margin: 0 8px 8px; }
+  .chan { padding: 6px 10px; border-radius: 7px; color: var(--dim); font-size: 14px; }
+  .chan.on { background: #eef0fd; color: var(--accent); font-weight: 600; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+  .topbar { display: flex; align-items: center; gap: 10px;
+            padding: 0 26px; height: 56px; border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,.72); backdrop-filter: blur(8px); }
+  .topbar b { font-size: 15px; }
+  .topbar span { color: #9aa2b4; font-size: 13px; }
+
+  .thread { flex: 1; padding: 22px 26px 0; display: flex;
+            flex-direction: column; justify-content: flex-end; gap: 18px; }
+  .msg { display: flex; gap: 12px; max-width: 780px; }
+  .av { width: 34px; height: 34px; border-radius: 10px; flex: 0 0 34px;
+        display: grid; place-items: center; color: #fff; font-size: 13px;
+        font-weight: 600; letter-spacing: .3px; }
+  .a1 { background: linear-gradient(140deg, #f0883b, #e2622f); }
+  .a2 { background: linear-gradient(140deg, #37b6a6, #1d9488); }
+  .who { font-weight: 600; font-size: 14px; }
+  .when { color: #a3aab9; font-size: 12px; margin-left: 8px; font-weight: 400; }
+  .body { color: #3b4353; }
+  .tag { color: var(--accent); }
+
+  .composer { margin: 18px 26px 200px; background: #fff;
+              border: 1px solid #dfe3ec; border-radius: 13px;
+              box-shadow: 0 10px 30px rgba(23,28,38,.07); overflow: hidden; }
+  .meta { display: flex; align-items: center; gap: 9px; padding: 12px 18px;
+          border-bottom: 1px solid #eef0f5; color: var(--dim); font-size: 13px; }
+  .chip { padding: 3px 10px; border-radius: 20px; background: #eef0fd;
+          color: var(--accent); font-weight: 500; }
+  textarea { display: block; width: 100%; min-height: 104px; padding: 16px 18px;
+             border: 0; outline: 0; resize: none; font: inherit; color: inherit; }
+  textarea::placeholder { color: #aeb5c4; }
+  .actions { display: flex; align-items: center; gap: 14px;
+             padding: 10px 14px 12px; border-top: 1px solid #eef0f5; }
+  .ghost { color: #b3bac7; font-size: 17px; }
+  .send { margin-left: auto; padding: 7px 18px; border: 0; border-radius: 8px;
+          background: var(--accent); color: #fff; font: inherit; font-weight: 500; }
 </style>
 
-<header>
-  <div class="mark"></div><div class="brand">Northwind</div>
-  <nav><span>Inbox</span><span>Threads</span><span>Drafts</span></nav>
-</header>
+<aside>
+  <div class="brand"><div class="mark"></div><b>Northwind</b></div>
+  <div class="group">Channels</div>
+  <div class="chan">general</div>
+  <div class="chan on">deploys</div>
+  <div class="chan">incidents</div>
+  <div class="chan">design</div>
+  <div class="group" style="margin-top:18px">Direct</div>
+  <div class="chan">Amélie R.</div>
+  <div class="chan">Tomas K.</div>
+</aside>
 
-<form class="composer" onsubmit="return false">
-  <div class="meta">To<span class="chip">#deploys</span></div>
-  <textarea placeholder="Write a message…"></textarea>
-  <div class="actions">
-    <span class="ghost">＋</span><span class="ghost">☺</span>
-    <button class="send" type="button">Send</button>
+<main>
+  <div class="topbar"><b>#deploys</b><span>· 24 members</span></div>
+
+  <div class="thread">
+    <div class="msg">
+      <div class="av a1">TK</div>
+      <div><div class="who">Tomas K.<span class="when">09:41</span></div>
+      <div class="body">Rolled <span class="tag">api@2.14.0</span> to staging. Green across the board.</div></div>
+    </div>
+    <div class="msg">
+      <div class="av a2">AR</div>
+      <div><div class="who">Amélie R.<span class="when">09:52</span></div>
+      <div class="body">Production run stopped halfway through last night — nobody has looked yet.</div></div>
+    </div>
   </div>
-</form>
+
+  <form class="composer" onsubmit="return false">
+    <div class="meta">To<span class="chip">#deploys</span></div>
+    <textarea placeholder="Write a message…"></textarea>
+    <div class="actions">
+      <span class="ghost">＋</span><span class="ghost">☺</span>
+      <button class="send" type="button">Send</button>
+    </div>
+  </form>
+</main>
 
 <script>
   // Repeated, not once: a browser settles focus into its address bar shortly
