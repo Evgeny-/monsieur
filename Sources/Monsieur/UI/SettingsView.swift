@@ -61,18 +61,29 @@ private struct GeneralTab: View {
                 Toggle("Play sounds", isOn: $store.settings.playSounds)
                 Toggle("Show the on-screen indicator", isOn: $store.settings.showHUD)
                 if store.settings.showHUD {
+                    // Shown as it is chosen. Picking a corner from a list and
+                    // then having to dictate to find out where that is puts the
+                    // answer several seconds and one decision away from the
+                    // question.
                     Picker("Position", selection: $store.settings.hudPosition) {
                         ForEach(HUDPosition.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
+                    .onChange(of: store.settings.hudPosition) { _, position in
+                        var preview = store.settings
+                        // The new value, not the stored one: @Published fires in
+                        // willSet, so the store still holds the old position
+                        // while this runs.
+                        preview.hudPosition = position
+                        HUDController.shared.preview(controller: .shared, settings: preview)
+                    }
+
                     Toggle("Show what is being heard", isOn: $store.settings.showLiveText)
                         .help("Off leaves a small dot that reacts to your voice. Wherever the overlay sits it covers something, and the transcript is the part that needs the room.")
-                    HStack {
-                        Spacer()
-                        Button("Preview") {
-                            HUDController.shared.preview(controller: .shared,
-                                                         settings: store.settings)
+                        .onChange(of: store.settings.showLiveText) { _, showing in
+                            var preview = store.settings
+                            preview.showLiveText = showing
+                            HUDController.shared.preview(controller: .shared, settings: preview)
                         }
-                    }
                 }
                 Toggle("Label the menu bar icon", isOn: $store.settings.showMenuBarLabel)
                     .help("Puts the app name beside the icon. A lone monochrome glyph is easy to lose in a crowded menu bar.")

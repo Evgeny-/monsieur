@@ -106,9 +106,14 @@ final class HUDController {
         let size = CGSize(width: content.width + Self.shadowMargin * 2,
                           height: content.height + Self.shadowMargin * 2)
         panel.setContentSize(NSSize(width: size.width, height: size.height))
-        // The margin is padding inside the window, so the visible pill would sit
-        // further from the edge than asked; offset it back out.
-        let origin = settings.hudPosition.origin(for: size, in: visible)
+
+        // Placed by the size of the visible capsule, not of the window around
+        // it. The window carries an invisible margin on every side so the
+        // shadow has somewhere to fall; measuring from the window and then
+        // subtracting that margin again double-counted it horizontally and not
+        // vertically, which put "bottom right" 24pt from the bottom and 60pt
+        // from the right. It looked wrong because it was.
+        let origin = settings.hudPosition.origin(for: content, in: visible)
         panel.setFrameOrigin(NSPoint(x: origin.x - Self.shadowMargin,
                                      y: origin.y - Self.shadowMargin))
 
