@@ -1,0 +1,16 @@
+.build/
+dist/
+*.xcodeproj
+.DS_Store
+
+# SwiftPM / Xcode-on-a-package detritus
+.swiftpm/
+xcuserdata/
+
+# Scripts/makeicon.swift's intermediate iconset directory. Not the same thing
+# as Resources/AppIcon.icns, which is a tracked resource the app bundle
+# actually ships -- that stays out of this file on purpose.
+*.iconset/
+
+# Anywhere a contributor might drop throwaway files
+.scratch/

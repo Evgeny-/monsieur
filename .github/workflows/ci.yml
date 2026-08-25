@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Run tests
+        run: swift test
+
+      # Exercises the same packaging path `make build` uses. No signing
+      # secrets are configured on purpose: Scripts/bundle.sh looks for the
+      # "Monsieur Dev" certificate that `make cert` creates locally, does
+      # not find one here, and falls back to ad-hoc signing (`codesign -s -`)
+      # with a warning. That produces a runnable, if TCC-unstable, .app --
+      # plenty to confirm the bundle assembles correctly in CI. Notarisation
+      # and a signed release build are a separate, deliberately unaddressed
+      # concern from this workflow.
+      - name: Build the app bundle
+        run: Scripts/bundle.sh
