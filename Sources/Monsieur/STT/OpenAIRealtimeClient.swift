@@ -146,10 +146,26 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
         receiveLoop(task)
     }
 
+    /// Session fields the server has refused this session; omitted on resend.
+    private var droppedFields: Set<String> = []
+
+    /// Recognises "The 'x' parameter is not supported…" and returns `x`.
+    /// Internal rather than private so the string matching can be tested: it is
+    /// the fragile half of the recovery, and the half that silently stops
+    /// working if the wording changes.
+    static func rejectedField(in message: String) -> String? {
+        let known = ["languages", "keywords", "turn_detection", "format"]
+        let lowered = message.lowercased()
+        guard lowered.contains("not supported") || lowered.contains("unknown parameter")
+        else { return nil }
+        return known.first { lowered.contains("'\($0)'") || lowered.contains("\"\($0)\"") }
+    }
+
     /// Builds the `session.update` body sent right after connecting.
     private func sessionUpdatePayload(settings: Settings) -> [String: Any] {
         var transcription: [String: Any] = ["model": settings.openAISTTModel]
-        if let lang = settings.sttLanguage, !lang.isEmpty {
+        if let lang = settings.sttLanguage, !lang.isEmpty,
+           !droppedFields.contains("languages") {
             // `languages` (plural) is the current hint field. OpenAI
             // deprecated the older singular `language` field and rejects a
             // session that sets both; a one-element array is how you pin a
@@ -157,7 +173,7 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
             transcription["languages"] = [lang]
         }
         let keywords = settings.glossary.map(\.canonical).filter { !$0.isEmpty }
-        if !keywords.isEmpty {
+        if !keywords.isEmpty, !droppedFields.contains("keywords") {
             transcription["keywords"] = keywords
         }
 
@@ -423,6 +439,19 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
             // occasional commit lands after the buffer is already empty.
             guard code != "input_audio_buffer_commit_empty" else { return }
             let message = (errorObject?["message"] as? String) ?? type
+
+            // A rejected session field is recoverable: the socket is open and
+            // the session exists, only one setting was refused. Drop it and
+            // resend the configuration rather than abandoning the recording --
+            // which support for `languages` varies by model, so this is not a
+            // hypothetical.
+            if let field = Self.rejectedField(in: message), !droppedFields.contains(field) {
+                droppedFields.insert(field)
+                Log.stt.info("server refused '\(field, privacy: .public)'; resending session config without it")
+                if let task, let settings { sendSessionUpdate(settings: settings, on: task) }
+                return
+            }
+
             Log.stt.error("server error: \(message, privacy: .public)")
             emit(.failed(.server(message)))
 
