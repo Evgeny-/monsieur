@@ -2,7 +2,7 @@
 
 # Monsieur
 
-**English, monsieur — do you speak it?**
+<img src="docs/hero.jpg" width="720" alt="A man in a black suit holding a microphone to a bewildered Frenchman: English, monsieur — do you speak it?">
 
 Dictation for macOS that hands you the language you needed, not the one you thought in.
 
