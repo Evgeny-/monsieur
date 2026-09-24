@@ -118,6 +118,11 @@ final class MenuBarController {
             // cannot remember which dictation that was.
             item.toolTip = last.map { String($0.prefix(200)) }
         }
+        if let item = statusItem.menu?.item(withTag: MenuTag.copyLastRaw.rawValue) {
+            let last = controller.history.first?.transcript
+            item.isEnabled = last != nil
+            item.toolTip = last.map { String($0.prefix(200)) }
+        }
         if let item = statusItem.menu?.item(withTag: MenuTag.status.rawValue) {
             switch state {
             case .idle: item.title = "Ready"
@@ -132,7 +137,7 @@ final class MenuBarController {
 
     private enum MenuTag: Int {
         case toggle = 1, status = 2, verbatim = 3
-        case cancel = 5, copyLast = 6
+        case cancel = 5, copyLast = 6, copyLastRaw = 7
     }
 
     private func buildMenu() {
@@ -166,6 +171,12 @@ final class MenuBarController {
         copyLast.tag = MenuTag.copyLast.rawValue
         copyLast.target = self
         menu.addItem(copyLast)
+
+        let copyLastRaw = NSMenuItem(title: "Copy last raw input",
+                                     action: #selector(copyLastRawInput), keyEquivalent: "")
+        copyLastRaw.tag = MenuTag.copyLastRaw.rawValue
+        copyLastRaw.target = self
+        menu.addItem(copyLastRaw)
 
         menu.addItem(.separator())
 
@@ -207,6 +218,11 @@ final class MenuBarController {
 
     @objc private func copyLastResult() {
         guard let last = controller.history.first?.output else { return }
+        TextInserter.copyToClipboard(last)
+    }
+
+    @objc private func copyLastRawInput() {
+        guard let last = controller.history.first?.transcript else { return }
         TextInserter.copyToClipboard(last)
     }
 

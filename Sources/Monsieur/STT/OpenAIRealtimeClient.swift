@@ -12,19 +12,13 @@ import Foundation
 ///   server -> `{"type":"conversation.item.input_audio_transcription.delta","delta":...}`          (incremental text -- accumulate)
 ///             `{"type":"conversation.item.input_audio_transcription.completed","transcript":...}` (final text for that turn)
 ///
-/// `turn_detection` is left `null` (manual commits) rather than
-/// `server_vad`. Both worked examples in OpenAI's own transcription guide
-/// configure it that way, and there are recent community reports of
-/// gpt-live-transcribe rejecting or silently ignoring server-side VAD
-/// despite the guide showing it elsewhere as a supported option. Manual
-/// commit is unambiguously supported, so instead of depending on VAD to
-/// segment speech into turns the way ElevenLabs' `commit_strategy=vad`
-/// does, `send(pcm:)` below checkpoints with a commit of its own every
-/// `commitInterval` seconds whenever there's uncommitted text. That's what
-/// gives the HUD ElevenLabs-style progressively "locked in" text instead of
-/// one giant provisional blob for the whole recording. An occasional
-/// checkpoint landing mid-sentence is cosmetic, not a correctness issue --
-/// `committedText` just joins the segments back together with spaces.
+/// `turn_detection` uses `server_vad`, because without it the transcription
+/// session does not emit text until an explicit commit. That gives a different
+/// shape of live text from ElevenLabs: text appears phrase-by-phrase at pauses
+/// rather than as continuously revised partials while the user is speaking.
+/// Explicit commits still matter at the end of a recording and as occasional
+/// checkpoints for any in-flight text, so `finish()` and `send(pcm:)` both keep
+/// the manual commit path alive.
 ///
 /// `keywords` biases recognition toward your glossary, the same job
 /// ElevenLabs' `keyterms` does. `removeFillerWords` has no counterpart here:
@@ -333,8 +327,8 @@ final class OpenAIRealtimeClient: NSObject, SpeechRecognizer {
         guard let task else { return }
         sendAppend(pcm, on: task)
 
-        // No VAD to segment speech for us here (see the class doc comment),
-        // so we checkpoint on our own clock instead of the server's.
+        // Server VAD usually finalizes phrases for us; this is a fallback
+        // checkpoint for any partial text that remains in flight.
         if !latestPartial.isEmpty, CFAbsoluteTimeGetCurrent() - lastCommitAt > Self.commitInterval {
             lastCommitAt = CFAbsoluteTimeGetCurrent()
             if let string = serialize(["type": "input_audio_buffer.commit"]) {

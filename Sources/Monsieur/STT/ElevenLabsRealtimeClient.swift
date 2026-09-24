@@ -19,6 +19,7 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
     private var committedSegments: [String] = []
     private var latestPartial = ""
     private var isClosing = false
+    private var hasStartedSession = false
     private var lastMessageAt = CFAbsoluteTimeGetCurrent()
 
     /// Kept so the session can be rebuilt without the caller's help.
@@ -57,9 +58,24 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
 
     // MARK: - Connect
 
-    func connect(settings: Settings) throws {
-        guard !settings.elevenLabsAPIKey.isEmpty else { throw SpeechError.missingAPIKey("ElevenLabs") }
+    /// Realtime limits differ from batch: 50 terms, 20 Unicode code points
+    /// per term. Keep the complete glossary for LLM post-processing; do not
+    /// truncate a technical name into a different word just to fit the API.
+    /// https://elevenlabs.io/docs/eleven-api/guides/cookbooks/speech-to-text/batch/keyterm-prompting
+    static func keyterms(from glossary: [GlossaryEntry]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for entry in glossary {
+            let term = entry.canonical.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !term.isEmpty, term.unicodeScalars.count <= 20,
+                  seen.insert(term.lowercased()).inserted else { continue }
+            result.append(term)
+            if result.count == 50 { break }
+        }
+        return result
+    }
 
+    static func connectionURL(settings: Settings) throws -> URL {
         var components = URLComponents(string: "wss://api.elevenlabs.io/v1/speech-to-text/realtime")
         var items: [URLQueryItem] = [
             .init(name: "model_id", value: settings.sttModel),
@@ -73,22 +89,40 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
             items.append(.init(name: "no_verbatim", value: "true"))
         }
         // Repeated params: the endpoint takes `keyterms` as a list.
-        for term in settings.glossary.map(\.canonical) where !term.isEmpty {
+        for term in keyterms(from: settings.glossary) {
             items.append(.init(name: "keyterms", value: term))
         }
         components?.queryItems = items
 
         guard let url = components?.url else { throw SpeechError.badURL }
+        return url
+    }
 
-        var request = URLRequest(url: url)
-        request.setValue(settings.elevenLabsAPIKey, forHTTPHeaderField: "xi-api-key")
-        request.timeoutInterval = 30
-
+    func connect(settings: Settings) throws {
+        guard !settings.elevenLabsAPIKey.isEmpty else { throw SpeechError.missingAPIKey("ElevenLabs") }
         self.settings = settings
         committedSegments = []
         latestPartial = ""
         isClosing = false
+        isReconnecting = false
         reconnects = 0
+        chunksSent = 0
+        pendingAudio = []
+        try openSocket(settings: settings)
+    }
+
+    /// A replacement socket must not reset the per-dictation retry budget.
+    private func openSocket(settings: Settings) throws {
+        let url = try Self.connectionURL(settings: settings)
+        let omitted = settings.glossary.count - Self.keyterms(from: settings.glossary).count
+        if omitted > 0 {
+            Log.stt.info("omitting \(omitted, privacy: .public) glossary entries from realtime hints; full glossary retained for rewriting")
+        }
+        var request = URLRequest(url: url)
+        request.setValue(settings.elevenLabsAPIKey, forHTTPHeaderField: "xi-api-key")
+        request.timeoutInterval = 30
+
+        hasStartedSession = false
         lastMessageAt = CFAbsoluteTimeGetCurrent()
 
         let config = URLSessionConfiguration.default
@@ -99,7 +133,6 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
         task.resume()
         receiveLoop(for: task)
         Log.stt.info("connecting to Scribe (\(settings.sttModel, privacy: .public))")
-        emit(.connected)
     }
 
     /// Replaces the socket without disturbing the transcript gathered so far.
@@ -112,6 +145,7 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
     private func reconnect(reason: String) {
         guard !isClosing, !isReconnecting, let settings else { return }
         guard reconnects < Self.maxReconnects else {
+            cancel()
             emit(.failed(.transport("Lost the transcription connection and could not re-establish it.")))
             return
         }
@@ -152,14 +186,13 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
         session = nil
 
         do {
-            try connect(settings: settings)
+            try openSocket(settings: settings)
         } catch {
-            isReconnecting = false
+            cancel()
             emit(.failed(.transport(error.localizedDescription)))
             return
         }
-        // connect() resets these; the transcript belongs to the dictation, not
-        // to whichever socket happened to carry it.
+        // The transcript belongs to the dictation, not to the socket.
         committedSegments = carried
         latestPartial = ""
         self.settings = settings
@@ -175,8 +208,7 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
     func send(pcm: Data) {
         if isReconnecting || task == nil {
             guard !isClosing else { return }
-            // Bounded: about ten seconds of 16 kHz PCM16. A reconnect that
-            // takes longer than that is not going to succeed.
+            // Bound memory while a session is opening or being replaced.
             if pendingAudio.count < 200 { pendingAudio.append(pcm) }
             return
         }
@@ -196,8 +228,11 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
         guard let json = try? JSONSerialization.data(withJSONObject: payload),
               let string = String(data: json, encoding: .utf8) else { return }
         task.send(.string(string)) { [weak self] error in
-            guard let error else { return }
-            self?.emit(.failed(.transport(error.localizedDescription)))
+            // Before acceptance, the receive path owns connection errors and
+            // can report invalid_request rather than a generic send failure.
+            guard let self, let error, self.hasStartedSession,
+                  !self.isClosing, self.task === task else { return }
+            self.emit(.failed(.transport(error.localizedDescription)))
         }
     }
 
@@ -252,6 +287,8 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
 
     func cancel() {
         isClosing = true
+        hasStartedSession = false
+        isReconnecting = false
         let dying = task
         task = nil
         dying?.cancel(with: .goingAway, reason: nil)
@@ -283,14 +320,17 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
         }
     }
 
-    private func handle(_ raw: String) {
+    /// Internal so recorded server frames can be regression-tested offline.
+    func handle(_ raw: String) {
         guard let data = raw.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = object["message_type"] as? String else { return }
 
         switch type {
         case "session_started":
+            hasStartedSession = true
             Log.stt.info("session started")
+            emit(.connected)
 
         case "partial_transcript":
             let text = (object["text"] as? String) ?? ""
@@ -311,19 +351,27 @@ final class ElevenLabsRealtimeClient: NSObject, SpeechRecognizer {
             break   // we do not use word timings
 
         default:
-            if type.contains("error") {
-                let message = (object["message"] as? String)
-                    ?? (object["error"] as? String)
-                    ?? type
+            if let message = Self.serverErrorMessage(in: object) {
                 let combined = (type + " " + message).lowercased()
-                if combined.contains("session") && combined.contains("limit") {
+                if type == "session_time_limit_exceeded"
+                    || (type != "invalid_request" && combined.contains("session") && combined.contains("limit")) {
                     reconnect(reason: "session time limit")
                     return
                 }
                 Log.stt.error("server error: \(message, privacy: .public)")
+                // In particular, invalid_request is terminal: reconnecting
+                // with the identical rejected options can never fix it.
+                cancel()
                 emit(.failed(.server(message)))
             }
         }
+    }
+
+    static func serverErrorMessage(in object: [String: Any]) -> String? {
+        guard let type = object["message_type"] as? String,
+              type.contains("error") || type == "invalid_request"
+                || type == "session_time_limit_exceeded" else { return nil }
+        return (object["message"] as? String) ?? (object["error"] as? String) ?? type
     }
 
     private func emit(_ event: SpeechEvent) {

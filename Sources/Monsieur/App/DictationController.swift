@@ -53,6 +53,8 @@ final class DictationController: ObservableObject {
     /// Set when stop arrives before recording has finished starting up. Without
     /// it, a quick push-to-talk tap would start a recording nothing ever stops.
     private var stopRequestedWhileStarting = false
+    /// Fence permission/capture completions from a cancelled or replaced start.
+    private var recordingID: UUID?
     private var didPromptForAccessibility = false
 
     private var settings: Settings { SettingsStore.shared.settings }
@@ -80,7 +82,9 @@ final class DictationController: ObservableObject {
         // Set synchronously: start-up is async, and without this a second
         // hotkey press before it completes would begin a second recording.
         state = .working("Starting…")
-        Task { await beginRecording() }
+        let id = UUID()
+        recordingID = id
+        Task { await beginRecording(id: id) }
     }
 
     func stop() {
@@ -96,6 +100,7 @@ final class DictationController: ObservableObject {
 
     /// Abandon everything without inserting anything.
     func cancel() {
+        recordingID = nil
         maxDurationTask?.cancel()
         recorder.stop()
         stt?.cancel()
@@ -107,12 +112,15 @@ final class DictationController: ObservableObject {
 
     // MARK: - Recording
 
-    private func beginRecording() async {
-        guard !settings.elevenLabsAPIKey.isEmpty else {
-            fail("No ElevenLabs API key yet. Open Settings and add one.")
+    private func beginRecording(id: UUID) async {
+        guard recordingID == id else { return }
+        guard settings.sttProvider.isConfigured(settings) else {
+            fail("No \(settings.sttProvider.label) API key yet. Open Settings and add one.")
             return
         }
-        guard await AudioRecorder.requestMicrophoneAccess() else {
+        let granted = await AudioRecorder.requestMicrophoneAccess()
+        guard recordingID == id else { return }
+        guard granted else {
             fail("Microphone access denied. System Settings > Privacy & Security > Microphone.")
             return
         }
@@ -131,7 +139,10 @@ final class DictationController: ObservableObject {
         sttFailure = nil
 
         let client = RecognizerFactory.make(for: settings)
-        client.onEvent = { [weak self] event in self?.handle(sttEvent: event) }
+        client.onEvent = { [weak self] event in
+            guard let self, self.recordingID == id else { return }
+            self.handle(sttEvent: event)
+        }
         do {
             try client.connect(settings: settings)
         } catch {
@@ -146,19 +157,35 @@ final class DictationController: ObservableObject {
             Log.app.info("auto-stopping after silence")
             self?.stop()
         }
+        recorder.onError = { [weak self] error in
+            guard let self, self.recordingID == id else { return }
+            self.cancel()
+            self.fail(error.localizedDescription)
+        }
         recorder.targetSampleRate = settings.sttProvider.requiredSampleRate
         recorder.silenceLimit = settings.silenceSeconds
         recorder.silenceDetectionEnabled = settings.autoStopOnSilence
 
         do {
-            try recorder.start()
+            try await recorder.start()
         } catch {
+            guard recordingID == id else { return }
             client.cancel()
             stt = nil
             fail(error.localizedDescription)
             return
         }
 
+        guard recordingID == id else { return }
+        // Capture now starts asynchronously: the socket can fail while we're
+        // awaiting its first PCM chunk, before handle(sttEvent:) sees .recording.
+        if let sttFailure {
+            recorder.stop()
+            client.cancel()
+            stt = nil
+            fail(sttFailure)
+            return
+        }
         state = .recording
         play(.start)
         startMaxDurationTimer()
@@ -337,6 +364,17 @@ final class DictationController: ObservableObject {
             try? handle.write(contentsOf: Data(text.utf8))
         } else {
             try? Data(text.utf8).write(to: url)
+        }
+    }
+
+    func clearHistory() {
+        history.removeAll()
+        let url = SettingsStore.historyURL
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch {
+            Log.config.error("could not delete history.jsonl: \(error.localizedDescription)")
         }
     }
 

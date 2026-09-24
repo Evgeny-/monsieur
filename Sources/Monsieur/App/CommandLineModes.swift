@@ -60,7 +60,7 @@ enum CommandLineModes {
         let bytesPerSecond = settings.sttProvider.requiredSampleRate * 2
         print("audio: \(pcm.count) bytes (\(String(format: "%.1f", Double(pcm.count) / bytesPerSecond))s at \(Int(settings.sttProvider.requiredSampleRate)) Hz)")
 
-        let client = ElevenLabsRealtimeClient()
+        let client = RecognizerFactory.make(for: settings)
         client.onEvent = { event in
             if case .failed(let error) = event { errorOut(error.localizedDescription) }
         }
@@ -73,7 +73,7 @@ enum CommandLineModes {
 
         return blocking {
             // 100 ms of audio per frame, paced roughly like a live microphone.
-            let frame = 3_200
+            let frame = Int(settings.sttProvider.requiredSampleRate * 0.1) * 2
             var offset = 0
             while offset < pcm.count {
                 let end = min(offset + frame, pcm.count)

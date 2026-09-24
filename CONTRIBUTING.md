@@ -9,7 +9,7 @@ make run
 
 `make cert` creates a self-signed code-signing certificate in its own
 keychain so the Accessibility and Microphone grants survive rebuilds -- see
-[Signing](README.md#signing) for why that is three separate fiddly problems
+[Signing](docs/internals.md#signing) for why that is three separate fiddly problems
 rather than one. Skip it and `make run` still works, but macOS will treat
 every rebuild as a new app and drop your Accessibility grant each time.
 
@@ -33,7 +33,8 @@ library target was needed just to make it testable.
 
 The suite covers the pure logic underneath the AppKit and network-I/O
 surface: hotkey string parsing, `Settings`' per-field-fallback JSON decoding,
-system prompt assembly, and the HUD style catalogue. It deliberately does not
+system prompt assembly, microphone startup/cancellation with a fake capture
+backend, and the PCM wire format. It deliberately does not
 attempt to drive AppKit views, the websocket clients, or anything needing a
 microphone -- `--transcribe` and `--preview-style` (README.md › Diagnostics)
 are the fast manual way to exercise those. `DictationController` is mostly
@@ -42,12 +43,24 @@ its few pure helpers (stop-phrase stripping, transcript normalisation) are
 currently `private` to the file. Widening one to `internal` to unit test it
 is a reasonable thing to do and does not need any deeper restructuring.
 
+### Microphone route regression check
+
+On a signed build with microphone permission, select the built-in microphone in
+System Settings > Sound > Input. Start/stop dictation, plug in output-only 3.5 mm
+headphones, then repeat without restarting the app. Repeat after unplugging them,
+and with headphones already connected at launch. Verify the meter and transcript
+work; also change the output route while recording. Check both STT providers
+(16/24 kHz), quick push-to-talk release during startup, and Escape followed by an
+immediate retry. A missing/unresponsive input must show an error after five
+seconds instead of leaving “Starting…” indefinitely. Automated tests cover the
+lifecycle and PCM contract, not physical jack insertion or the full STT path.
+
 ## Layout
 
 ```
 Sources/Monsieur/
   App/          entry point, delegate, DictationController state machine
-  Audio/        AVAudioEngine capture, resampling to 16 kHz PCM16, silence gate
+  Audio/        input-only AVCaptureSession, 16/24 kHz mono PCM16, silence gate
   STT/          ElevenLabs and OpenAI realtime websocket clients
   LLM/          prompt construction, OpenAI and Anthropic providers
   Insert/       clipboard-paste and Accessibility text insertion

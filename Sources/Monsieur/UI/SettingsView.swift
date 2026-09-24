@@ -382,9 +382,22 @@ private struct GlossaryTab: View {
 
 private struct HistoryTab: View {
     @ObservedObject var controller: DictationController
+    @State private var confirmingClear = false
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack {
+                Text("Dictation history")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Clear History") { confirmingClear = true }
+                    .disabled(controller.history.isEmpty)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            Divider()
+
             if controller.history.isEmpty {
                 Spacer()
                 Text("Nothing dictated yet.").foregroundStyle(.secondary)
@@ -399,7 +412,12 @@ private struct HistoryTab: View {
                                 Text("· \(app)").font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            CopyButton(text: entry.output).font(.caption)
+                            if entry.transcript != entry.output {
+                                CopyButton(text: entry.output, title: "Copy result").font(.caption)
+                                CopyButton(text: entry.transcript, title: "Copy original").font(.caption)
+                            } else {
+                                CopyButton(text: entry.output).font(.caption)
+                            }
                         }
                         Text(entry.output).font(.system(size: 12))
                         if entry.transcript != entry.output {
@@ -412,6 +430,14 @@ private struct HistoryTab: View {
                     .padding(.vertical, 3)
                 }
             }
+        }
+        .confirmationDialog("Clear dictation history?",
+                            isPresented: $confirmingClear,
+                            titleVisibility: .visible) {
+            Button("Clear History", role: .destructive) { controller.clearHistory() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes history.jsonl and removes every saved transcript from this list.")
         }
     }
 }
