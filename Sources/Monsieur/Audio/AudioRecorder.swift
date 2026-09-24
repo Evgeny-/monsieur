@@ -1,59 +1,67 @@
 import AVFoundation
-import Accelerate
 
-/// Captures the default input device and emits 16 kHz mono PCM16 chunks, which
-/// is exactly what the ElevenLabs realtime endpoint wants (`pcm_16000`).
-///
-/// The tap has to use the input node's native format -- installing a tap with
-/// any other format throws -- so resampling happens here via `AVAudioConverter`.
+/// Input-only capture. Headphones change the output route, not the microphone
+/// selected in System Settings. No AVAudioEngine default input/output aggregate.
+@MainActor
 final class AudioRecorder {
-
-    /// Mono signed 16-bit, little endian, interleaved, at whatever rate the
-    /// chosen transcription service requires.
-    static func format(sampleRate: Double) -> AVAudioFormat {
+    nonisolated static func format(sampleRate: Double) -> AVAudioFormat {
         AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: sampleRate,
                       channels: 1, interleaved: true)!
     }
 
-    /// Set before `start()`. Changing it mid-recording has no effect.
+    /// Snapshotted at start; changing it mid-recording has no effect.
     var targetSampleRate: Double = 16_000
-
-    private var targetFormat: AVAudioFormat { Self.format(sampleRate: targetSampleRate) }
-
-    /// Fires on an arbitrary audio thread with resampled PCM16 bytes.
+    /// All callbacks run on the main actor, including STT delivery.
     var onChunk: ((Data) -> Void)?
-    /// Fires on the main queue with a 0...1 level, for the HUD meter.
     var onLevel: ((Float) -> Void)?
-    /// Fires on the main queue once the input has been quiet for `silenceLimit`.
     var onSilence: (() -> Void)?
-
+    var onError: ((Error) -> Void)?
     var silenceLimit: TimeInterval = 2.5
     var silenceDetectionEnabled = false
 
-    private let engine = AVAudioEngine()
-    private var converter: AVAudioConverter?
-    private var isRunning = false
-
-    /// Speech gate, in dBFS. Anything quieter counts as silence.
+    private let makeCapture: () -> any AudioCapture
+    private let hasPermission: () -> Bool
+    private let startupTimeout: Duration
+    private var capture: (any AudioCapture)?
+    private var sessionID: UUID?
+    private var startup: CheckedContinuation<Void, Error>?
+    private var timeoutTask: Task<Void, Never>?
     private var noiseFloorDb: Float = -60
     private var lastSpeechAt: CFAbsoluteTime = 0
     private var hasHeardSpeech = false
 
+    init(startupTimeout: Duration = .seconds(5),
+         hasPermission: @escaping () -> Bool = {
+             AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+         },
+         makeCapture: @escaping () -> any AudioCapture = { MicrophoneCapture() }) {
+        self.startupTimeout = startupTimeout
+        self.hasPermission = hasPermission
+        self.makeCapture = makeCapture
+    }
+
     enum RecorderError: LocalizedError {
         case microphoneDenied
         case noInputDevice
+        case invalidAudioFormat
+        case startupTimedOut
+        case alreadyStarted
 
         var errorDescription: String? {
             switch self {
             case .microphoneDenied:
                 return "Microphone access was denied. Grant it in System Settings > Privacy & Security > Microphone."
             case .noInputDevice:
-                return "No usable audio input device."
+                return "No usable audio input device. Check Sound > Input in System Settings."
+            case .invalidAudioFormat:
+                return "The microphone could not provide mono PCM audio."
+            case .startupTimedOut:
+                return "The microphone did not start within 5 seconds. Check Sound > Input in System Settings and try again."
+            case .alreadyStarted:
+                return "Microphone capture is already starting or running."
             }
         }
     }
-
-    // MARK: - Permission
 
     static func requestMicrophoneAccess() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -63,107 +71,103 @@ final class AudioRecorder {
         }
     }
 
-    // MARK: - Lifecycle
-
-    func start() throws {
-        guard !isRunning else { return }
-        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
-            throw RecorderError.microphoneDenied
-        }
-
-        let input = engine.inputNode
-        let inputFormat = input.outputFormat(forBus: 0)
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
-            throw RecorderError.noInputDevice
-        }
-
-        converter = AVAudioConverter(from: inputFormat, to: targetFormat)
-        converter?.sampleRateConverterQuality = AVAudioQuality.high.rawValue
-
+    /// Wait for actual PCM, not merely a successful startRunning(). The timer
+    /// runs independently of the queue that may be blocked inside Core Audio.
+    func start() async throws {
+        try Task.checkCancellation()
+        guard sessionID == nil else { throw RecorderError.alreadyStarted }
+        guard hasPermission() else { throw RecorderError.microphoneDenied }
+        let id = UUID()
+        let capture = makeCapture()
+        self.capture = capture
+        sessionID = id
         noiseFloorDb = -60
         hasHeardSpeech = false
         lastSpeechAt = CFAbsoluteTimeGetCurrent()
 
-        input.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { [weak self] buffer, _ in
-            self?.handle(buffer: buffer, inputFormat: inputFormat)
-        }
-
-        engine.prepare()
-        try engine.start()
-        isRunning = true
-        Log.audio.info("capture started: \(inputFormat.sampleRate, privacy: .public) Hz in, \(self.targetSampleRate, privacy: .public) Hz out")
-    }
-
-    func stop() {
-        guard isRunning else { return }
-        isRunning = false
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        converter = nil
-        Log.audio.info("capture stopped")
-    }
-
-    // MARK: - Processing
-
-    private func handle(buffer: AVAudioPCMBuffer, inputFormat: AVAudioFormat) {
-        updateLevel(from: buffer)
-
-        guard let converter else { return }
-        let format = targetFormat
-        let ratio = format.sampleRate / inputFormat.sampleRate
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1024
-        guard let out = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return }
-
-        var error: NSError?
-        var delivered = false
-        converter.convert(to: out, error: &error) { _, status in
-            if delivered {
-                status.pointee = .noDataNow
-                return nil
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                startup = continuation
+                timeoutTask = Task { [weak self] in
+                    do { try await Task.sleep(for: self?.startupTimeout ?? .seconds(5)) }
+                    catch { return }
+                    self?.failed(RecorderError.startupTimedOut, session: id)
+                }
+                capture.start(sampleRate: targetSampleRate, onChunk: { [weak self] data in
+                    DispatchQueue.main.async { self?.received(data, session: id) }
+                }, onError: { [weak self] error in
+                    DispatchQueue.main.async { self?.failed(error, session: id) }
+                })
             }
-            delivered = true
-            status.pointee = .haveData
-            return buffer
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                guard self?.sessionID == id else { return }
+                self?.stop()
+            }
         }
-        if let error {
-            Log.audio.error("resample failed: \(error.localizedDescription)")
-            return
-        }
-        guard out.frameLength > 0, let channel = out.int16ChannelData else { return }
-
-        let byteCount = Int(out.frameLength) * MemoryLayout<Int16>.size
-        let data = Data(bytes: channel[0], count: byteCount)
-        onChunk?(data)
     }
 
-    private func updateLevel(from buffer: AVAudioPCMBuffer) {
-        guard let floats = buffer.floatChannelData, buffer.frameLength > 0 else { return }
-        var rms: Float = 0
-        vDSP_rmsqv(floats[0], 1, &rms, vDSP_Length(buffer.frameLength))
-        let db = rms > 0 ? 20 * log10(rms) : -100
+    /// Never waits on the hardware queue. Late callbacks are fenced by sessionID.
+    func stop() {
+        sessionID = nil
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        let pending = startup
+        startup = nil
+        capture?.stop()
+        capture = nil
+        pending?.resume(throwing: CancellationError())
+    }
 
-        // Slowly track the quiet baseline so the gate adapts to the room and mic.
+    private func failed(_ error: Error, session id: UUID) {
+        guard sessionID == id else { return }
+        let pending = startup
+        startup = nil
+        stop()
+        if let pending { pending.resume(throwing: error) }
+        else { onError?(error) }
+    }
+
+    private func received(_ data: Data, session id: UUID) {
+        guard sessionID == id, !data.isEmpty else { return }
+        if let pending = startup {
+            startup = nil
+            timeoutTask?.cancel()
+            timeoutTask = nil
+            Log.audio.info("microphone is delivering PCM")
+            pending.resume()
+        }
+        onChunk?(data)
+        updateLevel(from: data)
+    }
+
+    private func updateLevel(from data: Data) {
+        let rms: Float = data.withUnsafeBytes { bytes in
+            let count = bytes.count / MemoryLayout<Int16>.size
+            guard count > 0 else { return 0 }
+            var sum: Double = 0
+            for index in 0..<count {
+                let sample = Int16(littleEndian: bytes.loadUnaligned(
+                    fromByteOffset: index * 2, as: Int16.self))
+                let value = Double(sample) / 32768
+                sum += value * value
+            }
+            return Float(sqrt(sum / Double(count)))
+        }
+        let db = rms > 0 ? 20 * log10(rms) : -100
         if db < noiseFloorDb { noiseFloorDb = db }
         else { noiseFloorDb += (db - noiseFloorDb) * 0.0005 }
         noiseFloorDb = max(noiseFloorDb, -70)
 
-        let isSpeech = db > max(noiseFloorDb + 12, -48)
         let now = CFAbsoluteTimeGetCurrent()
-        if isSpeech {
+        if db > max(noiseFloorDb + 12, -48) {
             hasHeardSpeech = true
             lastSpeechAt = now
         }
-
-        // Map roughly -55..-10 dBFS onto 0...1 for the meter.
-        let level = min(max((db + 55) / 45, 0), 1)
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.onLevel?(level)
-            guard self.silenceDetectionEnabled, self.hasHeardSpeech, self.isRunning else { return }
-            if now - self.lastSpeechAt > self.silenceLimit {
-                self.silenceDetectionEnabled = false   // fire once per session
-                self.onSilence?()
-            }
+        onLevel?(min(max((db + 55) / 45, 0), 1))
+        if silenceDetectionEnabled, hasHeardSpeech, now - lastSpeechAt > silenceLimit {
+            silenceDetectionEnabled = false
+            onSilence?()
         }
     }
 }

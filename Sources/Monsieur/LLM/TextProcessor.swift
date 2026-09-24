@@ -49,7 +49,7 @@ enum ProcessorFactory {
                 // Optional, but it is how OpenRouter attributes traffic, and
                 // being identifiable is the polite default.
                 extraHeaders: [
-                    "HTTP-Referer": "https://github.com/monsieur",
+                    "HTTP-Referer": "https://github.com/Evgeny-/monsieur",
                     "X-Title": "Monsieur",
                 ],
                 providerName: "OpenRouter")
