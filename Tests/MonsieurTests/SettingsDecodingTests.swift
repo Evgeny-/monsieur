@@ -37,8 +37,48 @@ struct SettingsDecodingTests {
 
         var expected = Settings()
         expected.anthropicModel = "claude-haiku-4-5"
+        expected.anthropicEffort = ""
         expected.targetLanguage = "French"
         #expect(settings == expected)
+    }
+
+    // MARK: - Effort defaults stay compatible with saved models
+
+    @Test(arguments: [
+        """
+        {"openAIModel": "gpt-5.4-mini", "anthropicModel": "claude-haiku-4-5"}
+        """,
+        """
+        {
+          "openAIModel": "gpt-5.4-mini", "openAIReasoningEffort": null,
+          "anthropicModel": "claude-haiku-4-5", "anthropicEffort": 42
+        }
+        """,
+    ])
+    func olderModelsKeepPreviousEffortFallbacks(json: String) throws {
+        let settings = try decode(json)
+        #expect(settings.openAIModel == "gpt-5.4-mini")
+        #expect(settings.openAIReasoningEffort == "low")
+        #expect(settings.anthropicModel == "claude-haiku-4-5")
+        #expect(settings.anthropicEffort == "")
+    }
+
+    @Test(arguments: ["", "high", "custom-effort"])
+    func explicitEffortStringsSurviveForDefaultAndCustomModels(effort: String) throws {
+        let defaults = Settings()
+        for (openAIModel, anthropicModel) in [
+            (defaults.openAIModel, defaults.anthropicModel),
+            ("custom-openai-model", "custom-anthropic-model"),
+        ] {
+            let settings = try decode("""
+            {
+              "openAIModel": "\(openAIModel)", "openAIReasoningEffort": "\(effort)",
+              "anthropicModel": "\(anthropicModel)", "anthropicEffort": "\(effort)"
+            }
+            """)
+            #expect(settings.openAIReasoningEffort == effort)
+            #expect(settings.anthropicEffort == effort)
+        }
     }
 
     // MARK: - Unknown keys

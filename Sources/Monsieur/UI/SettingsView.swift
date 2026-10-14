@@ -283,19 +283,19 @@ private struct RewritingTab: View {
                     SecretField(title: "API key", text: $store.settings.openAIAPIKey)
                     TextField("Model", text: $store.settings.openAIModel)
                     TextField("Reasoning effort", text: $store.settings.openAIReasoningEffort)
-                        .help("minimal / low / medium / high. Empty omits the parameter.")
+                        .help("GPT-6 Luna supports none / low / medium / high / xhigh / max. None disables reasoning for faster translation. Empty uses the model's default. Other models may support different levels.")
                 case .anthropic:
                     SecretField(title: "API key", text: $store.settings.anthropicAPIKey)
                     TextField("Model", text: $store.settings.anthropicModel)
                     TextField("Effort", text: $store.settings.anthropicEffort)
-                        .help("low / medium / high / xhigh / max. Empty omits the parameter. Low keeps the round-trip short, which is what you feel between finishing a sentence and text appearing.")
+                        .help("Haiku 5.5 supports low / medium / high / xhigh / max. Low reduces adaptive thinking for faster translation. Empty uses the model's default; use empty for Haiku 4.5.")
                 case .openrouter:
                     SecretField(title: "API key", text: $store.settings.openRouterAPIKey)
                     TextField("Model", text: $store.settings.openRouterModel)
                         .help("Any model OpenRouter serves, in provider/model form.")
                 }
                 if !store.settings.llmProvider.suggestedModels.isEmpty {
-                    Text("Small and fast is the right call here — this runs on every utterance and the work is easy. Suggested: \(store.settings.llmProvider.suggestedModels.joined(separator: ", ")).")
+                    Text("Suggested models for translation: \(store.settings.llmProvider.suggestedModels.joined(separator: ", ")).")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }

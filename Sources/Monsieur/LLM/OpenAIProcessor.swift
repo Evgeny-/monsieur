@@ -3,7 +3,8 @@ import Foundation
 struct OpenAIProcessor: TextProcessor {
     let apiKey: String
     let model: String
-    /// "minimal" / "low" / "medium" / "high", or empty to omit the parameter.
+    /// Model-specific reasoning level; `none` disables it on GPT-6 Luna.
+    /// Empty omits the parameter and uses the model's default.
     let reasoningEffort: String
     /// OpenRouter serves the same chat-completions dialect, so it is this
     /// processor pointed at a different host rather than a second one.
