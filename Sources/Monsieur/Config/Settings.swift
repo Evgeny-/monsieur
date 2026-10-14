@@ -14,14 +14,13 @@ enum LLMProvider: String, Codable, CaseIterable {
         }
     }
 
-    /// This stage runs on every single utterance and the work is not hard --
-    /// translate, tidy, apply a glossary. Reach for a small fast model; a
-    /// frontier one costs many times more for no gain you will notice.
+    /// Prefer inexpensive models for per-utterance translation and rewriting.
+    /// Keep the previous defaults available for comparison on real dictations.
     var suggestedModels: [String] {
         switch self {
         case .none: return []
-        case .openai: return ["gpt-5.4-mini", "gpt-5.4"]
-        case .anthropic: return ["claude-haiku-4-5", "claude-sonnet-5"]
+        case .openai: return ["gpt-6-luna", "gpt-5.4-mini"]
+        case .anthropic: return ["claude-haiku-5-5", "claude-haiku-4-5"]
         case .openrouter: return [
             "anthropic/claude-haiku-4.5",
             "google/gemini-2.5-flash",
@@ -114,15 +113,16 @@ struct Settings: Codable, Equatable {
     /// indistinguishable from broken. First-run setup is what turns this on.
     var llmProvider: LLMProvider = .none
     var openAIAPIKey: String = ""
-    var openAIModel: String = "gpt-5.4-mini"
-    /// Sent as `reasoning_effort`. Empty string omits it entirely.
-    var openAIReasoningEffort: String = "low"
+    var openAIModel: String = "gpt-6-luna"
+    /// Sent as `reasoning_effort`. `none` disables reasoning on GPT-6 Luna;
+    /// empty uses the model's default, which is medium for Luna.
+    var openAIReasoningEffort: String = "none"
     var anthropicAPIKey: String = ""
-    var anthropicModel: String = "claude-haiku-4-5"
-    /// Sent as `output_config.effort`. Empty omits it, which is the default:
-    /// the small models this stage should be using reject the parameter, and
-    /// sending it costs a refused request plus a retry on every dictation.
-    var anthropicEffort: String = ""
+    var anthropicModel: String = "claude-haiku-5-5"
+    /// Sent as `output_config.effort`. Haiku 5.5 uses adaptive thinking by
+    /// default; low limits its work for translation. Empty omits the parameter
+    /// and is appropriate for older models such as Haiku 4.5.
+    var anthropicEffort: String = "low"
     var openRouterAPIKey: String = ""
     var openRouterModel: String = "anthropic/claude-haiku-4.5"
 
@@ -219,10 +219,14 @@ struct Settings: Codable, Equatable {
         llmProvider = v(.llmProvider, d.llmProvider)
         openAIAPIKey = v(.openAIAPIKey, d.openAIAPIKey)
         openAIModel = v(.openAIModel, d.openAIModel)
-        openAIReasoningEffort = v(.openAIReasoningEffort, d.openAIReasoningEffort)
+        // A saved model may omit effort. Preserve the previous fallback for
+        // older or custom models, whose supported levels can differ.
+        openAIReasoningEffort = v(.openAIReasoningEffort,
+                                 openAIModel == d.openAIModel ? d.openAIReasoningEffort : "low")
         anthropicAPIKey = v(.anthropicAPIKey, d.anthropicAPIKey)
         anthropicModel = v(.anthropicModel, d.anthropicModel)
-        anthropicEffort = v(.anthropicEffort, d.anthropicEffort)
+        anthropicEffort = v(.anthropicEffort,
+                            anthropicModel == d.anthropicModel ? d.anthropicEffort : "")
         openRouterAPIKey = v(.openRouterAPIKey, d.openRouterAPIKey)
         openRouterModel = v(.openRouterModel, d.openRouterModel)
         targetLanguage = v(.targetLanguage, d.targetLanguage)

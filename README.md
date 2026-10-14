@@ -76,6 +76,13 @@ and is optional; without it you get the raw transcript.
 Roughly a second and a half from the moment you stop speaking, on a small model.
 Configuration is a readable JSON file you can edit by hand.
 
+For new OpenAI configurations, the default is
+[GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) with
+reasoning effort `none`; Anthropic starts with
+[Claude Haiku 5.5](https://platform.claude.com/docs/en/models/haiku-5-5/overview)
+and effort `low`. Existing configurations keep their saved values; change the
+model and effort in Settings > Rewriting to switch.
+
 While you talk, a small overlay shows what is being heard. Put it in any corner,
 or turn the text off and leave a dot that reacts to your voice — wherever it
 sits it covers something, so it is yours to place.
